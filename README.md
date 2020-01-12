@@ -4,7 +4,7 @@ Suncat is a small Windows service that implements popular cyber-security monitor
 
 # Get started in Visual Studio
 
-As I didn't want to commit the .suo file, you have to setup the solution to use multiple startup projects so you can properly load the application in Debug mode. For that, right-click the solution, select Properties and choose Multiple startup projects option. Make sure that only SuncatServiceTestApp and SuncatHook projects have the Start action and all others are set to None. The projects should always default to the correct action. Click Apply.
+As I didn't want to commit the .suo file, you have to setup the solution to use multiple startup projects so you can properly load the application in Debug mode. For that, right-click the solution, select Properties and choose Multiple startup projects option. Make sure that only SuncatServiceTestApp and SuncatHook projects have the Start action and all others are set to None. The projects should always default to the correct action. Click Apply. Then, right-click the solution, restore NuGet Packages and restart Visual Studio in administrator mode. The solution has to be opened in administrator mode.
 
 # Log customizations
 
@@ -36,7 +36,7 @@ Select the Debug configuration. Build the solution and start. This will open a c
 
 Download and install the Microsoft Visual Studio Installer Projects extension for Visual Studio to fully build the solution in the Release mode. Just google it or install it through the Extensions menu inside Visual Studio. Then, Select the Release configuration. Build the solution. This will build the MSI file. Then, to create single EXE installer file, navigate to SuncatSetup folder, drag and drop the Release folder on the packager_installer.bat file. Follow the instructions and this will produce the EXE file in the current folder.
 
-A demo installer is available in the releases section of this repository. The demo logs all activities in C:\Insights.txt.
+A demo installer is available in the releases section of this repository. The demo logs all activities in the C:\Insights.txt file.
 
 # Limitations
 
