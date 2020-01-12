@@ -1,0 +1,49 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="All">
+  <ItemGroup>
+    <Projects Include="Cassia.sln" />
+  </ItemGroup>
+  <PropertyGroup>
+    <BuildPath>Bin</BuildPath>
+    <DocPath>Doc</DocPath>
+    <PackageLabel>Cassia-$(BUILD_BUILDNUMBER).zip</PackageLabel>
+    <DropPath>$(BUILD_ARTIFACTSTAGINGDIRECTORY)</DropPath>
+    <DropPath Condition="'$(DropPath)' == ''">$(BuildPath)\Publish</DropPath>
+    <MSBuildCommunityTasksPath>$(MSBuildProjectDirectory)\Tools\MSBuildCommunityTasks</MSBuildCommunityTasksPath>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildCommunityTasksPath)\MSBuild.Community.Tasks.Targets" />
+      
+  <Target Name="Clean">
+    <RemoveDir Directories="$(BuildPath);$(DocPath)" />
+    <MakeDir Directories="$(BuildPath);$(DropPath)" />
+  </Target>
+    
+  <Target Name="Build" DependsOnTargets="Clean">
+    <AssemblyInfo Condition="'$(BUILD_BUILDNUMBER)' != ''"
+                  CodeLanguage="CS"
+                  OutputFile="VersionInfo.cs"
+                  AssemblyVersion="$(BUILD_BUILDNUMBER)"
+                  AssemblyFileVersion="$(BUILD_BUILDNUMBER)"
+                  AssemblyCompany="Cassia Developers"
+                  AssemblyProduct="Cassia: .NET Terminal Services Library"
+                  AssemblyCopyright="Copyright © 2008 - 2018" />
+    <MSBuild Projects="@(Projects)" Targets="Build" Properties="Configuration=Release" />  
+  </Target>
+    
+  <Target Name="Package">
+    <CreateItem Include="**\*.*" Exclude="**\obj\**\*.*;**\*.suo;**\*.user;**\*.log;**\*.cache;**\.svn\**\*.*;**\*Resharper*\**\*.*;$(DropPath)\**\*.*">
+      <Output TaskParameter="Include" ItemName="PackageFiles" />
+    </CreateItem>
+    <Zip Files="@(PackageFiles)" ZipFileName="$(DropPath)\$(PackageLabel)" />
+  </Target>
+
+  <Target Name="NuGet">
+    <Exec Command="Tools\NuGet\NuGet.exe pack Source\Cassia\Cassia.csproj -OutputDirectory $(DropPath)" />
+  </Target>
+
+  <Target Name="Documentation">
+    <Exec Command="Tools\ImmDoc.NET\ImmDocNet.exe -pn:Cassia -cn:$(DocPath)\Cassia.chm -cp:Tools\HTMLHelpWorkshop -od:$(DocPath) $(BuildPath)\Cassia.xml $(BuildPath)\Cassia.dll" />
+  </Target>
+  
+  <Target Name="All" DependsOnTargets="Build;Documentation;Package;NuGet" />
+</Project>

@@ -1,0 +1,69 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{38241724-9B4B-4BA9-B2BC-044813C66C35}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>PListNet.Tests</RootNamespace>
+    <AssemblyName>PListNet.Tests</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug</OutputPath>
+    <DefineConstants>DEBUG;</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>false</ConsolePause>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>full</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>false</ConsolePause>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="nunit.framework">
+      <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="XmlReaderTests.cs" />
+    <Compile Include="TestFileHelper.cs" />
+    <Compile Include="BinaryReaderTests.cs" />
+    <Compile Include="BinaryWriterTests.cs" />
+    <Compile Include="XmlWriterTests.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <ItemGroup>
+    <None Include="packages.config" />
+    <EmbeddedResource Include="TestFiles\github-9.plist" />
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <EmbeddedResource Include="TestFiles\asdf-Info.plist" />
+    <EmbeddedResource Include="TestFiles\asdf-Info.bin.plist" />
+    <EmbeddedResource Include="TestFiles\uid-test.plist" />
+    <EmbeddedResource Include="TestFiles\unity.binary.plist" />
+    <EmbeddedResource Include="TestFiles\unity.xml.plist" />
+    <EmbeddedResource Include="TestFiles\dict-inside-array.plist" />
+    <EmbeddedResource Include="TestFiles\Pods-acknowledgements.plist" />
+    <EmbeddedResource Include="TestFiles\utf8-Info.plist" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PListNet.csproj">
+      <Project>{C1154025-FCAB-40AF-A715-91D10420C321}</Project>
+      <Name>PListNet</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+</Project>
