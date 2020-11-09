@@ -9,7 +9,7 @@ namespace SuncatObjects
         CreateFile,
         DeleteFile,
         ChangeFile,
-        MoveFile,
+        RenameFile,
         OpenFile,
         CopyFile,
         OpenURL,
@@ -31,6 +31,26 @@ namespace SuncatObjects
     [Serializable]
     public class SuncatLog
     {
+        public SuncatLog()
+        { 
+        }
+
+        public SuncatLog(FileSystemEventArgs e)
+        {
+            Event = e.ChangeType.ToSuncatLogEvent();
+
+            if (Event == SuncatLogEvent.RenameFile)
+            {
+                var rea = (RenamedEventArgs)e;
+                Data1 = rea.OldFullPath;
+                Data2 = rea.FullPath;
+            }
+            else
+            {
+                Data1 = e.FullPath;
+            }
+        }
+
         public DateTime DateTime { get; set; }
         public SuncatLogEvent Event { get; set; }
         public object DataObject { get; set; }
@@ -44,5 +64,23 @@ namespace SuncatObjects
     {
         public FileInfo FileInfo { get; set; }
         public bool IsDirectory { get; set; }
+    }
+
+    public static class SuncatExtensions
+    {
+        public static SuncatLogEvent ToSuncatLogEvent(this WatcherChangeTypes changeType)
+        {
+            SuncatLogEvent logEvent = SuncatLogEvent.None;
+
+            switch (changeType)
+            {
+                case WatcherChangeTypes.Created: logEvent = SuncatLogEvent.CreateFile; break;
+                case WatcherChangeTypes.Deleted: logEvent = SuncatLogEvent.DeleteFile; break;
+                case WatcherChangeTypes.Changed: logEvent = SuncatLogEvent.ChangeFile; break;
+                case WatcherChangeTypes.Renamed: logEvent = SuncatLogEvent.RenameFile; break;
+            }
+
+            return logEvent;
+        }
     }
 }

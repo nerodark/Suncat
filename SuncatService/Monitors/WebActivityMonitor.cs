@@ -67,7 +67,7 @@ namespace SuncatService.Monitors
             {
                 #if DEBUG
                     Debug.WriteLine(ex);
-
+                    
                     if (ex.InnerException != null)
                         Debug.WriteLine(ex.InnerException);
                 #else
@@ -211,7 +211,7 @@ namespace SuncatService.Monitors
                 {
                     #if DEBUG
                         Debug.WriteLine(ex);
-
+                        
                         if (ex.InnerException != null)
                             Debug.WriteLine(ex.InnerException);
                     #else
@@ -350,7 +350,7 @@ namespace SuncatService.Monitors
                 {
                     #if DEBUG
                         Debug.WriteLine(ex);
-
+                        
                         if (ex.InnerException != null)
                             Debug.WriteLine(ex.InnerException);
                     #else
@@ -487,7 +487,7 @@ namespace SuncatService.Monitors
                 {
                     #if DEBUG
                         Debug.WriteLine(ex);
-
+                        
                         if (ex.InnerException != null)
                             Debug.WriteLine(ex.InnerException);
                     #else
@@ -529,7 +529,7 @@ namespace SuncatService.Monitors
             {
                 #if DEBUG
                     Debug.WriteLine(ex);
-
+                    
                     if (ex.InnerException != null)
                         Debug.WriteLine(ex.InnerException);
                 #else

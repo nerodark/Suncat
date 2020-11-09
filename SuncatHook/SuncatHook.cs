@@ -106,7 +106,7 @@ namespace SuncatHook
             {
                 #if DEBUG
                     Debug.WriteLine(ex);
-
+                    
                     if (ex.InnerException != null)
                         Debug.WriteLine(ex.InnerException);
                 #else
@@ -135,7 +135,7 @@ namespace SuncatHook
             {
                 #if DEBUG
                     Debug.WriteLine(ex);
-
+                    
                     if (ex.InnerException != null)
                         Debug.WriteLine(ex.InnerException);
                 #else
@@ -158,7 +158,7 @@ namespace SuncatHook
                 {
                     #if DEBUG
                         Debug.WriteLine(ex2);
-
+                        
                         if (ex2.InnerException != null)
                             Debug.WriteLine(ex2.InnerException);
                     #else
@@ -202,7 +202,7 @@ namespace SuncatHook
             {
                 #if DEBUG
                     Debug.WriteLine(ex);
-
+                    
                     if (ex.InnerException != null)
                         Debug.WriteLine(ex.InnerException);
                 #else
@@ -450,7 +450,7 @@ namespace SuncatHook
                             {
                                 #if DEBUG
                                     Debug.WriteLine(ex);
-
+                                    
                                     if (ex.InnerException != null)
                                         Debug.WriteLine(ex.InnerException);
                                 #else
@@ -475,7 +475,7 @@ namespace SuncatHook
                 {
                     #if DEBUG
                         Debug.WriteLine(ex);
-
+                        
                         if (ex.InnerException != null)
                             Debug.WriteLine(ex.InnerException);
                     #else
@@ -577,7 +577,7 @@ namespace SuncatHook
                                         {
                                             #if DEBUG
                                                 Debug.WriteLine(ex);
-
+                                                
                                                 if (ex.InnerException != null)
                                                     Debug.WriteLine(ex.InnerException);
                                             #else
@@ -608,7 +608,7 @@ namespace SuncatHook
             {
                 var currentClipboardText = Clipboard.GetText(TextDataFormat.Text);
 
-                if (currentClipboardText != lastClipboardText)
+                if (!string.IsNullOrWhiteSpace(currentClipboardText) && currentClipboardText != lastClipboardText)
                 {
                     using (var memoryStream = new MemoryStream())
                     {
@@ -751,7 +751,7 @@ namespace SuncatHook
                     {
                         #if DEBUG
                             Debug.WriteLine(ex);
-
+                            
                             if (ex.InnerException != null)
                                 Debug.WriteLine(ex.InnerException);
                         #else
@@ -775,7 +775,7 @@ namespace SuncatHook
             {
                 #if DEBUG
                     Debug.WriteLine(ex);
-
+                    
                     if (ex.InnerException != null)
                         Debug.WriteLine(ex.InnerException);
                 #else
@@ -841,7 +841,7 @@ namespace SuncatHook
                                         {
                                             #if DEBUG
                                                 Debug.WriteLine(ex);
-
+                                                
                                                 if (ex.InnerException != null)
                                                     Debug.WriteLine(ex.InnerException);
                                             #else
@@ -911,7 +911,7 @@ namespace SuncatHook
                 {
                     #if DEBUG
                         Debug.WriteLine(ex);
-
+                        
                         if (ex.InnerException != null)
                             Debug.WriteLine(ex.InnerException);
                     #else

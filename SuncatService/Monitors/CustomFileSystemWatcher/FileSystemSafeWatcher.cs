@@ -9,11 +9,10 @@ using System.ComponentModel;
 
 namespace menelabs.core
 {
-
     /// <summary>
     /// This class wraps FileSystemEventArgs and RenamedEventArgs objects and detection of duplicate events.
     /// </summary>
-    internal class DelayedEvent
+    public class DelayedEvent
     {
         private readonly FileSystemEventArgs _args;
 
@@ -65,11 +64,32 @@ namespace menelabs.core
             // they update the file with the file content.
             return ((eO1 != null && eO2 != null && eO1.ChangeType == eO2.ChangeType
                 && eO1.FullPath == eO2.FullPath && eO1.Name == eO2.Name) &&
-                ((reO1 == null & reO2 == null) || (reO1 != null && reO2 != null &&
+                ((reO1 == null && reO2 == null) || (reO1 != null && reO2 != null &&
                 reO1.OldFullPath == reO2.OldFullPath && reO1.OldName == reO2.OldName))) ||
                 (eO1 != null && eO2 != null && eO1.ChangeType == WatcherChangeTypes.Created
                 && (eO2.ChangeType == WatcherChangeTypes.Changed || eO2.ChangeType == WatcherChangeTypes.Deleted)
                 && eO1.FullPath == eO2.FullPath && eO1.Name == eO2.Name);
+        }
+
+        public virtual bool IsAlsoRenamed(Queue deQueue)
+        {
+            if (deQueue != null && deQueue.Count > 0)
+            {
+                while (deQueue.Count > 0)
+                {
+                    DelayedEvent de = deQueue.Dequeue() as DelayedEvent;
+
+                    if (de != null)
+                    {
+                        if (_args != null && de._args != null && de._args.ChangeType == WatcherChangeTypes.Renamed && _args.FullPath == de._args.FullPath && _args.Name == de._args.Name)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
         }
     }
 
@@ -86,7 +106,7 @@ namespace menelabs.core
     /// cause some events not be fired at all since the last event will become the first event and
     /// it won't fire a if a new similar event arrives imediately afterwards).
     /// </summary>
-    internal class FileSystemSafeWatcher
+    public class FileSystemSafeWatcher : IDisposable
     {
         private readonly FileSystemWatcher _fileSystemWatcher;
 
@@ -143,6 +163,7 @@ namespace menelabs.core
                 }
             }
         }
+
         /// <summary>
         /// Gets or sets the filter string, used to determine what files are monitored in a directory.
         /// </summary>
@@ -158,6 +179,7 @@ namespace menelabs.core
                 _fileSystemWatcher.Filter = value;
             }
         }
+
         /// <summary>
         /// Gets or sets a value indicating whether subdirectories within the specified path should be monitored.
         /// </summary>
@@ -173,6 +195,7 @@ namespace menelabs.core
                 _fileSystemWatcher.IncludeSubdirectories = value;
             }
         }
+
         /// <summary>
         /// Gets or sets the size of the internal buffer.
         /// </summary>
@@ -188,6 +211,7 @@ namespace menelabs.core
                 _fileSystemWatcher.InternalBufferSize = value;
             }
         }
+
         /// <summary>
         /// Gets or sets the type of changes to watch for.
         /// </summary>
@@ -204,6 +228,7 @@ namespace menelabs.core
                 _fileSystemWatcher.NotifyFilter = value;
             }
         }
+
         /// <summary>
         /// Gets or sets the path of the directory to watch.
         /// </summary>
@@ -220,6 +245,7 @@ namespace menelabs.core
                 _fileSystemWatcher.Path = value;
             }
         }
+
         /// <summary>
         /// Gets or sets the object used to marshal the event handler calls issued as a result of a directory change.
         /// </summary>
@@ -235,6 +261,7 @@ namespace menelabs.core
                 _fileSystemWatcher.SynchronizingObject = value;
             }
         }
+
         /// <summary>
         /// Gets or sets an ISite for the FileSystemWatcher.
         /// </summary>
@@ -250,22 +277,27 @@ namespace menelabs.core
                 _fileSystemWatcher.Site = value;
             }
         }
+
         /// <summary>
         /// Occurs when a file or directory in the specified System.IO.FileSystemWatcher.Path is changed.
         /// </summary>
         public event FileSystemEventHandler Changed;
+
         /// <summary>
         /// Occurs when a file or directory in the specified System.IO.FileSystemWatcher.Path is created.
         /// </summary>
         public event FileSystemEventHandler Created;
+
         /// <summary>
         /// Occurs when a file or directory in the specified System.IO.FileSystemWatcher.Path is deleted.
         /// </summary>
         public event FileSystemEventHandler Deleted;
+
         /// <summary>
         /// Occurs when the internal buffer overflows.
         /// </summary>
         public event ErrorEventHandler Error;
+
         /// <summary>
         /// Occurs when a file or directory in the specified System.IO.FileSystemWatcher.Path is renamed.
         /// </summary>
@@ -278,6 +310,7 @@ namespace menelabs.core
         {
             _fileSystemWatcher.BeginInit();
         }
+
         /// <summary>
         /// Releases the unmanaged resources used by the System.IO.FileSystemWatcher and optionally releases the managed resources.
         /// </summary>
@@ -285,6 +318,7 @@ namespace menelabs.core
         {
             Uninitialize();
         }
+
         /// <summary>
         /// Ends the initialization of a System.IO.FileSystemWatcher used on a form or used by another component. The initialization occurs at run time.
         /// </summary>
@@ -292,6 +326,7 @@ namespace menelabs.core
         {
             _fileSystemWatcher.EndInit();
         }
+
         /// <summary>
         /// Raises the System.IO.FileSystemWatcher.Changed event.
         /// </summary>
@@ -301,6 +336,7 @@ namespace menelabs.core
             if (Changed != null)
                 Changed(this, e);
         }
+
         /// <summary>
         /// Raises the System.IO.FileSystemWatcher.Created event.
         /// </summary>
@@ -310,6 +346,7 @@ namespace menelabs.core
             if (Created != null)
                 Created(this, e);
         }
+
         /// <summary>
         /// Raises the System.IO.FileSystemWatcher.Deleted event.
         /// </summary>
@@ -319,6 +356,7 @@ namespace menelabs.core
             if (Deleted != null)
                 Deleted(this, e);
         }
+
         /// <summary>
         /// Raises the System.IO.FileSystemWatcher.Error event.
         /// </summary>
@@ -328,6 +366,7 @@ namespace menelabs.core
             if (Error != null)
                 Error(this, e);
         }
+
         /// <summary>
         /// Raises the System.IO.FileSystemWatcher.Renamed event.
         /// </summary>
@@ -337,6 +376,7 @@ namespace menelabs.core
             if (Renamed != null)
                 Renamed(this, e);
         }
+
         /// <summary>
         /// A synchronous method that returns a structure that contains specific information on the change that occurred, given the type of change you want to monitor.
         /// </summary>
@@ -347,6 +387,7 @@ namespace menelabs.core
             //TODO
             throw new NotImplementedException();
         }
+
         /// <summary>
         /// A synchronous method that returns a structure that contains specific information on the change that occurred, given the type of change you want to monitor
         /// and the time (in milliseconds) to wait before timing out.
@@ -432,10 +473,15 @@ namespace menelabs.core
                                         j--; // Don't skip next event
                                     }
                                 }
-                                
+
                                 bool raiseEvent = true;
-                                raiseEvent &= !SuncatService.Monitors.FileSystemActivityMonitor.IsIgnoredPath(current.Args.FullPath);
-                                raiseEvent &= (!(current.Args is RenamedEventArgs) || !SuncatService.Monitors.FileSystemActivityMonitor.IsIgnoredPath(((RenamedEventArgs)current.Args).OldFullPath));
+
+                                if (_ignoreEventCallback != null)
+                                {
+                                    var ignoreEventObject = Activator.CreateInstance(_ignoreEventType, current.Args);
+                                    raiseEvent &= !Convert.ToBoolean(_ignoreEventCallback.DynamicInvoke(ignoreEventObject));
+                                }
+
                                 if (current.Args.ChangeType != WatcherChangeTypes.Deleted)
                                 {
                                     raiseEvent &= File.Exists(current.Args.FullPath);
@@ -467,16 +513,11 @@ namespace menelabs.core
                                 {
                                     // Add the event to the list of events to be fired
                                     eventsToBeFired.Enqueue(current);
-                                    // Remove it from the current list
-                                    _events.RemoveAt(i);
-                                    i--; // Don't skip next event
                                 }
-                                else
-                                {
-                                    // Remove it from the current list
-                                    _events.RemoveAt(i);
-                                    i--; // Don't skip next event
-                                }
+
+                                // Remove it from the current list
+                                _events.RemoveAt(i);
+                                i--; // Don't skip next event
                             }
                             else
                             {
@@ -516,6 +557,7 @@ namespace menelabs.core
             if ((deQueue != null) && (deQueue.Count > 0))
             {
                 DelayedEvent de;
+                var deQueueClone = (Queue)deQueue.Clone();
                 while (deQueue.Count > 0)
                 {
                     de = deQueue.Dequeue() as DelayedEvent;
@@ -528,7 +570,11 @@ namespace menelabs.core
                             OnCreated(de.Args);
                             break;
                         case WatcherChangeTypes.Deleted:
-                            OnDeleted(de.Args);
+                            // Discard deleted event if the same file is renamed right after
+                            if (!de.IsAlsoRenamed(deQueueClone))
+                            {
+                                OnDeleted(de.Args);
+                            }
                             break;
                         case WatcherChangeTypes.Renamed:
                             OnRenamed(de.Args as RenamedEventArgs);
@@ -538,6 +584,16 @@ namespace menelabs.core
             }
         }
         #endregion
+
+        public delegate bool IgnoreEvent<T>(T callback);
+        private Type _ignoreEventType;
+        private Delegate _ignoreEventCallback;
+
+        public void SetIgnoreEventCallback<T>(IgnoreEvent<T> callback)
+        {
+            _ignoreEventType = typeof(T);
+            _ignoreEventCallback = callback;
+        }
     }
 
 }

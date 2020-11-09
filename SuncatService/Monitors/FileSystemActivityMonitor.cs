@@ -29,38 +29,11 @@ namespace SuncatService.Monitors
         private static readonly string serviceName = new ProjectInstaller().ServiceInstaller.ServiceName;
         private static readonly string rootDrive = Path.GetPathRoot(Environment.SystemDirectory);
         private static readonly string serviceAppData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), serviceName);
-        //private static EventWatcher filter;
         private static VolumeWatcher volumeWatcher;
         private static Dictionary<string, RecoveringFileSystemWatcher> fileSystemWatchers;
         private static Thread recentFilesChecker;
 
         public static event TrackEventHandler Track;
-
-        //private static IObservable<FileSystemEvent>[] CreateSourcesDriverMode(EventWatcher watcher)
-        //{
-        //    return new[]
-        //    {
-        //        Observable.FromEventPattern<FileEventHandler, FileSystemEvent>(
-        //            h => watcher.OnCreate += h,
-        //            h => watcher.OnCreate -= h)
-        //            .Select(ev => ev.EventArgs),
-
-        //        Observable.FromEventPattern<FileEventHandler, FileSystemEvent>(
-        //            h => watcher.OnDelete += h,
-        //            h => watcher.OnDelete -= h)
-        //            .Select(ev => ev.EventArgs),
-
-        //        Observable.FromEventPattern<FileEventHandler, FileSystemEvent>(
-        //            h => watcher.OnChange += h,
-        //            h => watcher.OnChange -= h)
-        //            .Select(ev => ev.EventArgs),
-
-        //        Observable.FromEventPattern<MoveEventHandler, RenameOrMoveEvent>(
-        //            h => watcher.OnRenameOrMove += h,
-        //            h => watcher.OnRenameOrMove -= h)
-        //            .Select(ev => ev.EventArgs),
-        //    };
-        //}
 
         private static IObservable<FileSystemEventArgs>[] CreateSourcesNormalMode(BufferingFileSystemWatcher watcher)
         {
@@ -88,163 +61,55 @@ namespace SuncatService.Monitors
             };
         }
 
-        public static bool IsIgnoredPath(string path)
+        public static bool IgnoreEventCallback(SuncatLog log)
         {
             var ignored = false;
-            var manager = new TerminalServicesManager();
 
-            ignored |= Regex.IsMatch(path, $@"^{rootDrive}Users\[^\]+\AppData\".Replace(@"\", @"\\"), RegexOptions.IgnoreCase);
-            ignored |= path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.Windows), StringComparison.OrdinalIgnoreCase);
-            ignored |= path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), StringComparison.OrdinalIgnoreCase);
-            ignored |= path.IndexOf("$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase) > -1;
-            ignored |= path.IndexOf("$WINDOWS", StringComparison.OrdinalIgnoreCase) > -1;
-            ignored |= path.IndexOf("Config.Msi", StringComparison.OrdinalIgnoreCase) > -1;
-            ignored |= path.IndexOf("System Volume Information", StringComparison.OrdinalIgnoreCase) > -1;
-            ignored |= path.IndexOf("WindowsApps", StringComparison.OrdinalIgnoreCase) > -1;
-            ignored |= path.IndexOf("SystemApps", StringComparison.OrdinalIgnoreCase) > -1;
-            ignored |= path.IndexOf("rempl", StringComparison.OrdinalIgnoreCase) > -1;
-            ignored |= path.EndsWith("desktop.ini", StringComparison.OrdinalIgnoreCase);
-            ignored |= Path.GetFileName(path).StartsWith("~");
-            ignored |= Path.GetFileName(path).EndsWith("~");
-            ignored |= Path.GetExtension(path).Equals(".tmp", StringComparison.OrdinalIgnoreCase);
-            ignored |= Path.GetExtension(path).Equals(".lnk", StringComparison.OrdinalIgnoreCase);
-            ignored |= (manager != null && manager.ActiveConsoleSession != null && !string.IsNullOrEmpty(manager.ActiveConsoleSession.UserName)
-                        && path.StartsWith($@"{rootDrive}Users\") && !path.StartsWith($@"{rootDrive}Users\{manager.ActiveConsoleSession.UserName}\"));
+            Func<SuncatLogEvent, string, bool> ignoreFilePatterns = delegate (SuncatLogEvent logEvent, string path)
+            {
+                if (path != null && path.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
+                {
+                    return false;
+                }
+
+                var manager = new TerminalServicesManager();
+
+                ignored |= Regex.IsMatch(path, $@"^{rootDrive}Users\[^\]+\AppData\".Replace(@"\", @"\\"), RegexOptions.IgnoreCase);
+                ignored |= path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.Windows), StringComparison.OrdinalIgnoreCase);
+                ignored |= path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), StringComparison.OrdinalIgnoreCase);
+                ignored |= path.IndexOf("$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase) > -1;
+                ignored |= path.IndexOf("$WINDOWS", StringComparison.OrdinalIgnoreCase) > -1;
+                ignored |= path.IndexOf("Config.Msi", StringComparison.OrdinalIgnoreCase) > -1;
+                ignored |= path.IndexOf("System Volume Information", StringComparison.OrdinalIgnoreCase) > -1;
+                ignored |= path.IndexOf("WindowsApps", StringComparison.OrdinalIgnoreCase) > -1;
+                ignored |= path.IndexOf("SystemApps", StringComparison.OrdinalIgnoreCase) > -1;
+                ignored |= path.EndsWith("desktop.ini", StringComparison.OrdinalIgnoreCase);
+                ignored |= (Path.GetFileName(path).StartsWith("~") && logEvent != SuncatLogEvent.RenameFile);
+                ignored |= (Path.GetFileName(path).EndsWith("~") && logEvent != SuncatLogEvent.RenameFile);
+                ignored |= (Path.GetExtension(path).Equals(".tmp", StringComparison.OrdinalIgnoreCase) && logEvent != SuncatLogEvent.RenameFile);
+                ignored |= Path.GetExtension(path).Equals(".lnk", StringComparison.OrdinalIgnoreCase);
+                ignored |= (manager != null && manager.ActiveConsoleSession != null && !string.IsNullOrEmpty(manager.ActiveConsoleSession.UserName)
+                            && path.StartsWith($@"{rootDrive}Users\") && !path.StartsWith($@"{rootDrive}Users\{manager.ActiveConsoleSession.UserName}\"));
+                ignored |= (path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), StringComparison.OrdinalIgnoreCase)
+                            && !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase));
+                ignored |= (path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), StringComparison.OrdinalIgnoreCase)
+                            && !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase));
+
+                return ignored;
+            };
+
+            if (log.Data1 != null)
+            {
+                ignored |= ignoreFilePatterns(log.Event, log.Data1);
+            }
+
+            if (log.Data2 != null)
+            {
+                ignored |= ignoreFilePatterns(log.Event, log.Data2);
+            }
 
             return ignored;
         }
-
-        //private static void StartFileSystemWatcherDriverMode()
-        //{
-        //    filter = new EventWatcher();
-
-        //    while (true)
-        //    {
-        //        try
-        //        {
-        //            filter.Connect();
-        //            break;
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            Debug.WriteLine(ex);
-
-        //            if (ex.InnerException != null)
-        //                Debug.WriteLine(ex.InnerException);
-
-        //            Thread.Sleep(1000);
-        //        }
-        //    }
-
-        //    filter.NotWatchProcess(EventWatcher.GetCurrentProcessId());
-        //    filter.WatchPath("*");
-
-        //    var watcher = Observable.Using(
-        //        () => filter,
-        //        w => CreateSourcesDriverMode(w)
-        //        .Merge()
-        //        .GroupBy(fse => fse.Filename)
-        //        .SelectMany(fse => fse.BufferUntilInactive(new TimeSpan(0, 0, 1))));
-
-        //    watcher.Subscribe(fse =>
-        //    {
-        //        if (fse != null)
-        //        {
-        //            try
-        //            {
-        //                var manager = new TerminalServicesManager();
-
-        //                if (manager != null && manager.ActiveConsoleSession != null && !string.IsNullOrEmpty(manager.ActiveConsoleSession.UserName))
-        //                {
-        //                    var process = Process.GetProcesses().FirstOrDefault(p => p.Id == Convert.ToInt32(fse.ProcessId));
-
-        //                    if (process != null
-        //                        && !IsIgnoredPath(fse.Filename)
-        //                        && (!(fse is RenameOrMoveEvent) || !IsIgnoredPath(((RenameOrMoveEvent)fse).OldFilename))
-        //                        && process.SessionId == manager.ActiveConsoleSession.SessionId
-        //                        // Only log files, not directories (don't check for files exist on delete)
-        //                        && (fse.Type == CenterDevice.MiniFSWatcher.Types.EventType.Delete || System.IO.File.Exists(fse.Filename)))
-        //                    {
-        //                        var te = new TrackEventArgs();
-        //                        var log = new SuncatLog();
-
-        //                        log.DateTime = DateTime.Now;
-
-        //                        switch (fse.Type)
-        //                        {
-        //                            case CenterDevice.MiniFSWatcher.Types.EventType.Create: log.Event = SuncatLogEvent.CreateFile; break;
-        //                            case CenterDevice.MiniFSWatcher.Types.EventType.Delete: log.Event = SuncatLogEvent.DeleteFile; break;
-        //                            case CenterDevice.MiniFSWatcher.Types.EventType.Change: log.Event = SuncatLogEvent.ChangeFile; break;
-        //                            case CenterDevice.MiniFSWatcher.Types.EventType.Move: log.Event = SuncatLogEvent.MoveFile; break;
-        //                        }
-
-        //                        if (fse.Type == CenterDevice.MiniFSWatcher.Types.EventType.Move)
-        //                        {
-        //                            var rme = (RenameOrMoveEvent)fse;
-        //                            log.Data1 = rme.OldFilename;
-        //                            log.Data2 = rme.Filename;
-        //                        }
-        //                        else
-        //                        {
-        //                            log.Data1 = fse.Filename;
-        //                        }
-
-        //                        try
-        //                        {
-        //                            log.Data3 = volumeWatcher.DriveList[fse.Filename.Substring(0, 1)].DriveType.ToString();
-        //                        }
-        //                        catch (Exception ex)
-        //                        {
-        //                            Debug.WriteLine(ex);
-
-        //                            if (ex.InnerException != null)
-        //                                Debug.WriteLine(ex.InnerException);
-        //                        }
-
-        //                        te.LogData = log;
-
-        //                        Track?.Invoke(null, te);
-        //                    }
-        //                }
-        //            }
-        //            catch (Exception ex)
-        //            {
-        //                Debug.WriteLine(ex);
-
-        //                if (ex.InnerException != null)
-        //                    Debug.WriteLine(ex.InnerException);
-        //            }
-        //        }
-        //    },
-        //    ex =>
-        //    {
-        //        Debug.WriteLine(ex);
-
-        //        if (ex.InnerException != null)
-        //            Debug.WriteLine(ex.InnerException);
-        //    });
-        //}
-
-        //private static void StopFileSystemWatcherDriverMode()
-        //{
-        //    try
-        //    {
-        //        if (filter != null)
-        //        {
-        //            using (filter)
-        //            {
-        //                filter.Disconnect();
-        //            }
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Debug.WriteLine(ex);
-
-        //        if (ex.InnerException != null)
-        //            Debug.WriteLine(ex.InnerException);
-        //    }
-        //}
 
         private static async void CheckUserRecentFiles()
         {
@@ -299,9 +164,7 @@ namespace SuncatService.Monitors
 
                                         link.TargetPath = link.TargetPath.Replace(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), $@"{rootDrive}Users\{manager.ActiveConsoleSession.UserName}");
 
-                                        if (recentFileDate > lastRecentFileDate
-                                            && !IsIgnoredPath(link.TargetPath)
-                                            && System.IO.File.Exists(link.TargetPath))
+                                        if (recentFileDate > lastRecentFileDate && System.IO.File.Exists(link.TargetPath))
                                         {
                                             newRecentFiles.Insert(0, link.TargetPath);
                                         }
@@ -322,7 +185,7 @@ namespace SuncatService.Monitors
                             {
                                 #if DEBUG
                                     Debug.WriteLine(ex);
-
+                                    
                                     if (ex.InnerException != null)
                                         Debug.WriteLine(ex.InnerException);
                                 #else
@@ -351,7 +214,7 @@ namespace SuncatService.Monitors
                             {
                                 #if DEBUG
                                     Debug.WriteLine(ex);
-
+                                    
                                     if (ex.InnerException != null)
                                         Debug.WriteLine(ex.InnerException);
                                 #else
@@ -369,7 +232,10 @@ namespace SuncatService.Monitors
                             // Make the event wait a bit to let the Open event appear after a Create event if necessary.
                             await Task.Delay(3000).ContinueWith(_ =>
                             {
-                                Track?.Invoke(null, te);
+                                if (!IgnoreEventCallback(log))
+                                {
+                                    Track?.Invoke(null, te);
+                                }
                             });
                         }
 
@@ -383,7 +249,7 @@ namespace SuncatService.Monitors
                 {
                     #if DEBUG
                         Debug.WriteLine(ex);
-
+                        
                         if (ex.InnerException != null)
                             Debug.WriteLine(ex.InnerException);
                     #else
@@ -398,7 +264,7 @@ namespace SuncatService.Monitors
             }
         }
 
-        private static void StartFileSystemWatcherNormalMode()
+        private static void StartFileSystemWatcher()
         {
             fileSystemWatchers = new Dictionary<string, RecoveringFileSystemWatcher>();
 
@@ -406,10 +272,13 @@ namespace SuncatService.Monitors
             {
                 var driveLetter = (char)(i + 'A');
 
+                // Source: https://petermeinl.wordpress.com/2015/05/18/tamed-filesystemwatcher/
                 var watcher = new RecoveringFileSystemWatcher();
                 watcher.IncludeSubdirectories = true;
+                watcher.OrderByOldestFirst = true;
                 // To enable LastAccess filter: fsutil behavior set DisableLastAccess 0 (and reboot?)
-                watcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.CreationTime | NotifyFilters.Size | NotifyFilters.Security | NotifyFilters.Attributes;
+                watcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite | NotifyFilters.CreationTime | NotifyFilters.Size;// | NotifyFilters.LastAccess | NotifyFilters.Security | NotifyFilters.Attributes;
+                watcher.SetIgnoreEventCallback<SuncatLog>(IgnoreEventCallback);
 
                 watcher.Created += FileSystemEventHandler;
                 watcher.Changed += FileSystemEventHandler;
@@ -420,7 +289,7 @@ namespace SuncatService.Monitors
             }
         }
 
-        private static void StopFileSystemWatcherNormalMode()
+        private static void StopFileSystemWatcher()
         {
             if (fileSystemWatchers != null)
             {
@@ -452,7 +321,7 @@ namespace SuncatService.Monitors
             {
                 #if DEBUG
                     Debug.WriteLine(ex);
-
+                    
                     if (ex.InnerException != null)
                         Debug.WriteLine(ex.InnerException);
                 #else
@@ -476,7 +345,7 @@ namespace SuncatService.Monitors
             {
                 #if DEBUG
                     Debug.WriteLine(ex);
-
+                    
                     if (ex.InnerException != null)
                         Debug.WriteLine(ex.InnerException);
                 #else
@@ -490,108 +359,111 @@ namespace SuncatService.Monitors
 
         private static void FileSystemEventHandler(object sender, FileSystemEventArgs e)
         {
+            var log = new SuncatLog();
+
+            log.Event = e.ChangeType.ToSuncatLogEvent();
+
             // Only log files, not directories (don't check for files exist on delete)
-            if (e.ChangeType == WatcherChangeTypes.Deleted || System.IO.File.Exists(e.FullPath))
+            if (log.Event == SuncatLogEvent.DeleteFile || System.IO.File.Exists(e.FullPath))
             {
                 var te = new TrackEventArgs();
-                var log = new SuncatLog();
-
+                
                 log.DateTime = DateTime.Now;
-
-                switch (e.ChangeType)
-                {
-                    case WatcherChangeTypes.Created: log.Event = SuncatLogEvent.CreateFile; break;
-                    case WatcherChangeTypes.Deleted: log.Event = SuncatLogEvent.DeleteFile; break;
-                    case WatcherChangeTypes.Changed: log.Event = SuncatLogEvent.ChangeFile; break;
-                    case WatcherChangeTypes.Renamed: log.Event = SuncatLogEvent.MoveFile; break;
-                }
             
-                if (e.ChangeType == WatcherChangeTypes.Renamed)
+                switch (log.Event)
                 {
-                    var rea = (RenamedEventArgs)e;
-                    log.Data1 = rea.OldFullPath;
-                    log.Data2 = rea.FullPath;
-                }
-                else
-                {
-                    switch (e.ChangeType)
-                    {
-                        case WatcherChangeTypes.Created:
-                        case WatcherChangeTypes.Changed:
+                    case SuncatLogEvent.CreateFile:
+                    case SuncatLogEvent.ChangeFile:
+                        {
+                            string copiedFile = null;
+                            var isCopiedFile = false;
+
+                            if (HookActivityMonitor.LastCopiedFiles != null && HookActivityMonitor.LastCopiedFiles.Count > 0)
                             {
-                                string copiedFile = null;
-                                var isCopiedFile = false;
+                                var currentFileInfo = new FileInfo(e.FullPath);
 
-                                if (HookActivityMonitor.LastCopiedFiles != null && HookActivityMonitor.LastCopiedFiles.Count > 0)
+                                foreach (var copiedFileInfo in HookActivityMonitor.LastCopiedFiles.OrderByDescending(f => f.FileInfo.Name.Length))
                                 {
-                                    var currentFileInfo = new FileInfo(e.FullPath);
-
-                                    foreach (var copiedFileInfo in HookActivityMonitor.LastCopiedFiles)
+                                    if (copiedFileInfo.IsDirectory)
                                     {
-                                        if (copiedFileInfo.IsDirectory)
-                                        {
-                                            copiedFile = FindCopiedFile(new DirectoryInfo(copiedFileInfo.FileInfo.FullName), currentFileInfo, currentFileInfo.Directory);
+                                        copiedFile = FindCopiedFile(new DirectoryInfo(copiedFileInfo.FileInfo.FullName), currentFileInfo, currentFileInfo.Directory);
 
-                                            if (copiedFile != null)
-                                            {
-                                                isCopiedFile = true;
-                                                break;
-                                            }
-                                        }
-                                        else
+                                        if (copiedFile != null)
                                         {
-                                            if (currentFileInfo.Name == copiedFileInfo.FileInfo.Name)
-                                            {
-                                                isCopiedFile = true;
-                                                copiedFile = copiedFileInfo.FileInfo.FullName;
-                                                break;
-                                            }
+                                            isCopiedFile = true;
+                                            break;
                                         }
                                     }
-                                }
-
-                                if (isCopiedFile)
-                                {
-                                    log.Event = SuncatLogEvent.CopyFile;
-                                    log.Data1 = copiedFile;
-                                    log.Data2 = e.FullPath;
-
-                                    try
+                                    else
                                     {
-                                        log.Data3 = volumeWatcher.DriveList[copiedFile.Substring(0, 1)].DriveType.ToString();
+                                        if (currentFileInfo.Name.StartsWith(Path.GetFileNameWithoutExtension(copiedFileInfo.FileInfo.Name)))
+                                        {
+                                            isCopiedFile = true;
+                                            copiedFile = copiedFileInfo.FileInfo.FullName;
+                                            break;
+                                        }
                                     }
-                                    catch (Exception ex)
-                                    {
-                                        #if DEBUG
-                                            Debug.WriteLine(ex);
-                                            
-                                            if (ex.InnerException != null)
-                                                Debug.WriteLine(ex.InnerException);
-                                        #else
-                                            Trace.WriteLine(ex);
-
-                                            if (ex.InnerException != null)
-                                                Trace.WriteLine(ex.InnerException);
-                                        #endif
-
-                                        log.Data3 = copiedFile.StartsWith(@"\\") ? DriveType.Network.ToString() : DriveType.Unknown.ToString();
-                                    }
-
-                                    log.Data3 += ",";
-                                }
-                                else
-                                {
-                                    log.Data1 = e.FullPath;
                                 }
                             }
-                            break;
 
-                        default:
+                            if (isCopiedFile)
+                            {
+                                log.Event = SuncatLogEvent.CopyFile;
+                                log.Data1 = copiedFile;
+                                log.Data2 = e.FullPath;
+
+                                try
+                                {
+                                    log.Data3 = volumeWatcher.DriveList[copiedFile.Substring(0, 1)].DriveType.ToString();
+                                }
+                                catch (Exception ex)
+                                {
+                                    #if DEBUG
+                                        Debug.WriteLine(ex);
+                                           
+                                        if (ex.InnerException != null)
+                                            Debug.WriteLine(ex.InnerException);
+                                    #else
+                                        Trace.WriteLine(ex);
+
+                                        if (ex.InnerException != null)
+                                            Trace.WriteLine(ex.InnerException);
+                                    #endif
+
+                                    log.Data3 = copiedFile.StartsWith(@"\\") ? DriveType.Network.ToString() : DriveType.Unknown.ToString();
+                                }
+
+                                log.Data3 += ",";
+                            }
+                            else
                             {
                                 log.Data1 = e.FullPath;
                             }
-                            break;
-                    }
+                        }
+                        break;
+
+                    case SuncatLogEvent.RenameFile:
+                        {
+                            var rea = (RenamedEventArgs)e;
+
+                            if (Path.GetExtension(rea.OldFullPath).Equals(Path.GetExtension(rea.FullPath), StringComparison.OrdinalIgnoreCase))
+                            {
+                                log.Data1 = rea.OldFullPath;
+                                log.Data2 = rea.FullPath;
+                            }
+                            else
+                            {
+                                log.Event = SuncatLogEvent.ChangeFile;
+                                log.Data1 = rea.FullPath;
+                            }
+                        }
+                        break;
+
+                    default:
+                        {
+                            log.Data1 = e.FullPath;
+                        }
+                        break;
                 }
 
                 try
@@ -615,13 +487,33 @@ namespace SuncatService.Monitors
 
                 te.LogData = log;
 
-                Track?.Invoke(null, te);
+                // The ignore part of these events are processed in the custom FileSystemWatcher's core
+                switch (log.Event)
+                {
+                    case SuncatLogEvent.CreateFile:
+                    case SuncatLogEvent.DeleteFile:
+                    case SuncatLogEvent.ChangeFile:
+                    case SuncatLogEvent.RenameFile:
+                        {
+                            Track?.Invoke(null, te);
+                        }
+                        break;
+
+                    default:
+                        {
+                            if (!IgnoreEventCallback(log))
+                            {
+                                Track?.Invoke(null, te);
+                            }
+                        }
+                        break;
+                }
             }
         }
 
         private static string FindCopiedFile(DirectoryInfo baseDirectory, FileInfo currentFile, DirectoryInfo currentFileDirectory)
         {
-            if (currentFileDirectory.Name == baseDirectory.Name)
+            if (currentFileDirectory.Name.StartsWith(baseDirectory.Name))
             {
                 return Path.Combine(baseDirectory.FullName, currentFile.FullName.Replace(currentFileDirectory.FullName, string.Empty).TrimStart(Path.DirectorySeparatorChar));
             }
@@ -637,8 +529,7 @@ namespace SuncatService.Monitors
 
         public static void Start()
         {
-            //StartFileSystemWatcherDriverMode();
-            StartFileSystemWatcherNormalMode();
+            StartFileSystemWatcher();
 
             volumeWatcher = new VolumeWatcher();
             volumeWatcher.DriveInserted += VolumeWatcher_DriveInserted;
@@ -659,8 +550,7 @@ namespace SuncatService.Monitors
                 volumeWatcher = null;
             }
 
-            //StopFileSystemWatcherDriverMode();
-            StopFileSystemWatcherNormalMode();
+            StopFileSystemWatcher();
         }
     }
 }

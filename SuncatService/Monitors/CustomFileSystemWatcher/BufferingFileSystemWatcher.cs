@@ -2,11 +2,14 @@
 using menelabs.core;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using static menelabs.core.FileSystemSafeWatcher;
 
 namespace LeanWork.IO.FileSystem
 {
@@ -316,25 +319,26 @@ namespace LeanWork.IO.FileSystem
 
         private void NotifyExistingFiles()
         {
+            //BufferingFileSystemWatcher_Error(this, new ErrorEventArgs(new Exception("test exception")));
+
             var searchSubDirectoriesOption = (IncludeSubdirectories) ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
             if (OrderByOldestFirst)
             {
-                var sortedFileNames = from fi in new DirectoryInfo(Path).GetFiles(Filter, searchSubDirectoriesOption)
+                var sortedFileInfos = from fi in new DirectoryInfo(Path).GetFiles(Filter, searchSubDirectoriesOption)
                                       orderby fi.LastWriteTime ascending
-                                      select fi.Name;
-                foreach (var fileName in sortedFileNames)
+                                      select fi;
+                foreach (var fi in sortedFileInfos)
                 {
-                    InvokeHandler(_onExistedHandler, new FileSystemEventArgs(WatcherChangeTypes.All, Path, fileName));
-                    InvokeHandler(_onAllChangesHandler, new FileSystemEventArgs(WatcherChangeTypes.All, Path, fileName));
+                    InvokeHandler(_onExistedHandler, new FileSystemEventArgs(WatcherChangeTypes.All, fi.DirectoryName, fi.Name));
+                    InvokeHandler(_onAllChangesHandler, new FileSystemEventArgs(WatcherChangeTypes.All,fi.DirectoryName, fi.Name));
                 }
             }
             else
             {
-                foreach (var filePath in Directory.EnumerateFiles(Path, Filter, searchSubDirectoriesOption))
+                foreach (var fsi in new DirectoryInfo(Path).EnumerateFileSystemInfos(Filter, searchSubDirectoriesOption))
                 {
-                    var fileName = System.IO.Path.GetFileName(filePath);
-                    InvokeHandler(_onExistedHandler, new FileSystemEventArgs(WatcherChangeTypes.All, Path, fileName));
-                    InvokeHandler(_onAllChangesHandler, new FileSystemEventArgs(WatcherChangeTypes.All, Path, fileName));
+                    InvokeHandler(_onExistedHandler, new FileSystemEventArgs(WatcherChangeTypes.All, System.IO.Path.GetDirectoryName(fsi.FullName), fsi.Name ));
+                    InvokeHandler(_onAllChangesHandler, new FileSystemEventArgs(WatcherChangeTypes.All, System.IO.Path.GetDirectoryName(fsi.FullName), fsi.Name));
                 }
             }
         }
@@ -390,6 +394,11 @@ namespace LeanWork.IO.FileSystem
                 //_onErrorHandler = null;
             }
             base.Dispose(disposing);
+        }
+
+        public void SetIgnoreEventCallback<T>(IgnoreEvent<T> callback)
+        {
+            _containedFSW.SetIgnoreEventCallback<T>(callback);
         }
     }
 }

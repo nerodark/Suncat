@@ -167,7 +167,7 @@ namespace SuncatService
                         {
                             #if DEBUG
                                 Debug.WriteLine(ex);
-
+                                
                                 if (ex.InnerException != null)
                                     Debug.WriteLine(ex.InnerException);
                             #else
@@ -323,17 +323,17 @@ namespace SuncatService
             }
             catch (Exception ex)
             {
-#if DEBUG
+                #if DEBUG
                     Debug.WriteLine(ex);
-
+                    
                     if (ex.InnerException != null)
                         Debug.WriteLine(ex.InnerException);
-#else
-                Trace.WriteLine(ex);
+                #else
+                    Trace.WriteLine(ex);
 
-                if (ex.InnerException != null)
-                    Trace.WriteLine(ex.InnerException);
-#endif
+                    if (ex.InnerException != null)
+                        Trace.WriteLine(ex.InnerException);
+                #endif
             }
         }
     }
