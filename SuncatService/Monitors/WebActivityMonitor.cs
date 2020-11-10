@@ -84,7 +84,7 @@ namespace SuncatService.Monitors
         private static void CheckFirefoxHistory(string dataDir, string tempFileName)
         {
             var lastDatabaseMD5Hash = default(string);
-            Int64? firstUrlTime = null, lastUrlTime = null;
+            DateTime? firstUrlTime = null, lastUrlTime = null;
             var newUrls = new List<Tuple<string, string>>();
 
             while (true)
@@ -118,7 +118,7 @@ namespace SuncatService.Monitors
                                         {
                                             connection.Open();
 
-                                            using (var command = new SQLiteCommand("select moz_places.url, moz_places.title, moz_historyvisits.visit_date from moz_historyvisits join moz_places on moz_places.id = moz_historyvisits.place_id order by moz_historyvisits.visit_date desc", connection))
+                                            using (var command = new SQLiteCommand("select mp.url, mp.title, strftime('%Y-%m-%d %H:%M:%f', mhv.visit_date / 1000000.0, 'unixepoch', 'localtime') as visit_date from moz_places mp join moz_historyvisits mhv on mhv.place_id = mp.id order by visit_date desc, mhv.id desc", connection))
                                             {
                                                 using (var reader = command.ExecuteReader())
                                                 {
@@ -128,43 +128,60 @@ namespace SuncatService.Monitors
                                                     {
                                                         while (reader.Read())
                                                         {
-                                                            var url = Convert.ToString(reader["url"]);
-                                                            var title = Convert.ToString(reader["title"]);
-                                                            var urlTime = Convert.ToInt64(reader["visit_date"]);
-
-                                                            if (lastUrlTime.HasValue)
+                                                            try
                                                             {
-                                                                if (urlTime >= lastUrlTime)
+                                                                var url = Convert.ToString(reader["url"]);
+                                                                var title = Convert.ToString(reader["title"]);
+                                                                var urlTime = Convert.ToDateTime(reader["visit_date"]);
+
+                                                                if (lastUrlTime.HasValue)
                                                                 {
-                                                                    if (newUrls.Count == 0)
+                                                                    if (urlTime >= lastUrlTime)
                                                                     {
-                                                                        firstUrlTime = urlTime;
+                                                                        if (newUrls.Count == 0)
+                                                                        {
+                                                                            firstUrlTime = urlTime;
+                                                                        }
+
+                                                                        if (urlTime > lastUrlTime
+                                                                            && url.StartsWith("http"))
+                                                                        {
+                                                                            var tuple = new Tuple<string, string>(url, string.IsNullOrWhiteSpace(title) ? null : title.Trim());
+
+                                                                            newUrls.Insert(0, tuple);
+                                                                        }
                                                                     }
-
-                                                                    if (urlTime > lastUrlTime
-                                                                        && url.StartsWith("http"))
+                                                                    else
                                                                     {
-                                                                        var tuple = new Tuple<string, string>(url, string.IsNullOrWhiteSpace(title) ? null : title.Trim());
-
-                                                                        newUrls.Insert(0, tuple);
+                                                                        lastUrlTime = firstUrlTime;
+                                                                        break;
                                                                     }
                                                                 }
                                                                 else
                                                                 {
-                                                                    lastUrlTime = firstUrlTime;
+                                                                    lastUrlTime = urlTime;
                                                                     break;
                                                                 }
                                                             }
-                                                            else
+                                                            catch (Exception ex) // usually FormatException coming from DateTime conversion
                                                             {
-                                                                lastUrlTime = urlTime;
-                                                                break;
+                                                                #if DEBUG
+                                                                    Debug.WriteLine(ex);
+                                                                    
+                                                                    if (ex.InnerException != null)
+                                                                        Debug.WriteLine(ex.InnerException);
+                                                                #else
+                                                                    Trace.WriteLine(ex);
+
+                                                                    if (ex.InnerException != null)
+                                                                        Trace.WriteLine(ex.InnerException);
+                                                                #endif
                                                             }
                                                         }
                                                     }
                                                     else
                                                     {
-                                                        lastUrlTime = default(Int64);
+                                                        lastUrlTime = default(DateTime);
                                                     }
 
                                                     foreach (var url in newUrls)
@@ -196,7 +213,7 @@ namespace SuncatService.Monitors
                             }
                             else
                             {
-                                lastUrlTime = default(Int64);
+                                lastUrlTime = default(DateTime);
                             }
                         }
                         else
@@ -229,7 +246,7 @@ namespace SuncatService.Monitors
         private static void CheckChromeHistory(string dataDir, string tempFileName)
         {
             var lastDatabaseMD5Hash = default(string);
-            Int64? firstUrlTime = null, lastUrlTime = null;
+            DateTime? firstUrlTime = null, lastUrlTime = null;
             var newUrls = new List<Tuple<string, string>>();
 
             while (true)
@@ -258,7 +275,7 @@ namespace SuncatService.Monitors
                                     {
                                         connection.Open();
 
-                                        using (var command = new SQLiteCommand("select urls.url, urls.title, visits.visit_time from visits join urls on urls.id = visits.url order by visits.visit_time desc", connection))
+                                        using (var command = new SQLiteCommand("select u.url, u.title, strftime('%Y-%m-%d %H:%M:%f', v.visit_time / 1000000.0 - 11644473600, 'unixepoch', 'localtime') as visit_time from urls u join visits v on v.url = u.id order by visit_time desc, v.id desc", connection))
                                         {
                                             using (var reader = command.ExecuteReader())
                                             {
@@ -268,43 +285,59 @@ namespace SuncatService.Monitors
                                                 {
                                                     while (reader.Read())
                                                     {
-                                                        var url = Convert.ToString(reader["url"]);
-                                                        var title = Convert.ToString(reader["title"]);
-                                                        var urlTime = Convert.ToInt64(reader["visit_time"]);
-
-                                                        if (lastUrlTime.HasValue)
+                                                        try
                                                         {
-                                                            if (urlTime >= lastUrlTime)
+                                                            var url = Convert.ToString(reader["url"]);
+                                                            var title = Convert.ToString(reader["title"]);
+                                                            var urlTime = Convert.ToDateTime(reader["visit_time"]);
+
+                                                            if (lastUrlTime.HasValue)
                                                             {
-                                                                if (newUrls.Count == 0)
+                                                                if (urlTime >= lastUrlTime)
                                                                 {
-                                                                    firstUrlTime = urlTime;
+                                                                    if (newUrls.Count == 0)
+                                                                    {
+                                                                        firstUrlTime = urlTime;
+                                                                    }
+
+                                                                    if (urlTime > lastUrlTime && url.StartsWith("http"))
+                                                                    {
+                                                                        var tuple = new Tuple<string, string>(url, string.IsNullOrWhiteSpace(title) ? null : title.Trim());
+
+                                                                        newUrls.Insert(0, tuple);
+                                                                    }
                                                                 }
-
-                                                                if (urlTime > lastUrlTime
-                                                                    && url.StartsWith("http"))
+                                                                else
                                                                 {
-                                                                    var tuple = new Tuple<string, string>(url, string.IsNullOrWhiteSpace(title) ? null : title.Trim());
-
-                                                                    newUrls.Insert(0, tuple);
+                                                                    lastUrlTime = firstUrlTime;
+                                                                    break;
                                                                 }
                                                             }
                                                             else
                                                             {
-                                                                lastUrlTime = firstUrlTime;
+                                                                lastUrlTime = urlTime;
                                                                 break;
                                                             }
                                                         }
-                                                        else
+                                                        catch (Exception ex) // usually FormatException coming from DateTime conversion
                                                         {
-                                                            lastUrlTime = urlTime;
-                                                            break;
+                                                            #if DEBUG
+                                                                Debug.WriteLine(ex);
+                                                                
+                                                                if (ex.InnerException != null)
+                                                                    Debug.WriteLine(ex.InnerException);
+                                                            #else
+                                                                Trace.WriteLine(ex);
+
+                                                                if (ex.InnerException != null)
+                                                                    Trace.WriteLine(ex.InnerException);
+                                                            #endif
                                                         }
                                                     }
                                                 }
                                                 else
                                                 {
-                                                    lastUrlTime = default(Int64);
+                                                    lastUrlTime = default(DateTime);
                                                 }
 
                                                 foreach (var url in newUrls)
@@ -335,7 +368,7 @@ namespace SuncatService.Monitors
                             }
                             else
                             {
-                                lastUrlTime = default(Int64);
+                                lastUrlTime = default(DateTime);
                             }
                         }
                         else
@@ -365,7 +398,7 @@ namespace SuncatService.Monitors
             }
         }
 
-        private static void CheckSafariHistory(string dataDir, string tempFileName)
+        private static void CheckSafariWinHistory(string dataDir, string tempFileName)
         {
             var lastDatabaseMD5Hash = default(string);
             Double? firstUrlTime = null, lastUrlTime = null;
@@ -502,6 +535,14 @@ namespace SuncatService.Monitors
             }
         }
 
+        private static void CheckSafariMacHistory(string dataDir, string tempFileName)
+        {
+            // ~/Library/Safari/History.db
+            // select hi.url, hv.title, strftime('%Y-%m-%d %H:%M:%f', hv.visit_time + 978307200, 'unixepoch', 'localtime') as visit_time from history_items hi join history_visits hv on hv.history_item = hi.id order by visit_time desc, hv.id desc
+
+            throw new NotImplementedException();
+        }
+
         private static void EnableFirefoxProxy(string dataDir, bool enabled)
         {
             try
@@ -568,7 +609,7 @@ namespace SuncatService.Monitors
             operaHistoryChecker.IsBackground = true;
             operaHistoryChecker.Start();
 
-            safariHistoryChecker = new Thread(() => CheckSafariHistory($@"{rootDrive}Users\[USERNAME]\AppData\Roaming\Apple Computer\Safari", "Safari"));
+            safariHistoryChecker = new Thread(() => CheckSafariWinHistory($@"{rootDrive}Users\[USERNAME]\AppData\Roaming\Apple Computer\Safari", "Safari"));
             safariHistoryChecker.IsBackground = true;
             safariHistoryChecker.Start();
 
