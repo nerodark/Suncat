@@ -6,6 +6,7 @@ using System.IO;
 using System.Timers;
 using System.Collections;
 using System.ComponentModel;
+using System.Collections.Generic;
 
 namespace menelabs.core
 {
@@ -70,20 +71,41 @@ namespace menelabs.core
                 && (eO2.ChangeType == WatcherChangeTypes.Changed || eO2.ChangeType == WatcherChangeTypes.Deleted)
                 && eO1.FullPath == eO2.FullPath && eO1.Name == eO2.Name);
         }
+    }
 
-        public virtual bool IsAlsoRenamed(Queue deQueue)
+    public static class FileSystemEventArgsExtensions
+    {
+        public static bool HasEvent(this FileSystemEventArgs obj, WatcherChangeTypes changeType)
         {
-            if (deQueue != null && deQueue.Count > 0)
+            if (obj != null)
             {
-                while (deQueue.Count > 0)
+                if (obj is SmartFileSystemRenamedEventArgs)
                 {
-                    DelayedEvent de = deQueue.Dequeue() as DelayedEvent;
+                    var reO1 = obj as SmartFileSystemRenamedEventArgs;
 
-                    if (de != null)
+                    if (reO1 != null && reO1.ConsolidatedEvents != null && reO1.ConsolidatedEvents.Count > 0)
                     {
-                        if (_args != null && de._args != null && de._args.ChangeType == WatcherChangeTypes.Renamed && _args.FullPath == de._args.FullPath && _args.Name == de._args.Name)
+                        foreach (var reO2 in reO1.ConsolidatedEvents)
                         {
-                            return true;
+                            if (reO1.ChangeType != reO2.ChangeType && reO2.ChangeType == changeType && reO1.FullPath == reO2.FullPath && reO1.Name == reO2.Name)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    var eO1 = obj as SmartFileSystemEventArgs;
+
+                    if (eO1 != null && eO1.ConsolidatedEvents != null && eO1.ConsolidatedEvents.Count > 0)
+                    {
+                        foreach (var eO2 in eO1.ConsolidatedEvents)
+                        {
+                            if (eO1.ChangeType != eO2.ChangeType && eO2.ChangeType == changeType && eO1.FullPath == eO2.FullPath && eO1.Name == eO2.Name)
+                            {
+                                return true;
+                            }
                         }
                     }
                 }
@@ -91,6 +113,65 @@ namespace menelabs.core
 
             return false;
         }
+
+        public static int SameFileEventCount(this FileSystemEventArgs obj)
+        {
+            var count = 0;
+
+            if (obj != null)
+            {
+                if (obj is SmartFileSystemRenamedEventArgs)
+                {
+                    var reO1 = obj as SmartFileSystemRenamedEventArgs;
+
+                    if (reO1 != null && reO1.ConsolidatedEvents != null && reO1.ConsolidatedEvents.Count > 0)
+                    {
+                        foreach (var reO2 in reO1.ConsolidatedEvents)
+                        {
+                            if (reO1.FullPath == reO2.FullPath && reO1.Name == reO2.Name)
+                            {
+                                count++;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    var eO1 = obj as SmartFileSystemEventArgs;
+
+                    if (eO1 != null && eO1.ConsolidatedEvents != null && eO1.ConsolidatedEvents.Count > 0)
+                    {
+                        foreach (var eO2 in eO1.ConsolidatedEvents)
+                        {
+                            if (eO1.FullPath == eO2.FullPath && eO1.Name == eO2.Name)
+                            {
+                                count++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return count;
+        }
+    }
+
+    public class SmartFileSystemEventArgs : FileSystemEventArgs
+    {
+        public SmartFileSystemEventArgs(FileSystemEventArgs e) : base(e.ChangeType, Path.GetPathRoot(e.FullPath), e.Name)
+        {
+        }
+
+        public List<FileSystemEventArgs> ConsolidatedEvents { get; set; }
+    }
+
+    public class SmartFileSystemRenamedEventArgs : RenamedEventArgs
+    {
+        public SmartFileSystemRenamedEventArgs(RenamedEventArgs e) : base(e.ChangeType, Path.GetPathRoot(e.FullPath), e.Name, e.OldName)
+        {
+        }
+
+        public List<FileSystemEventArgs> ConsolidatedEvents { get; set; }
     }
 
     /// <summary>
@@ -278,20 +359,23 @@ namespace menelabs.core
             }
         }
 
+        public delegate void SmartFileSystemEventHandler(object sender, SmartFileSystemEventArgs e);
+        public delegate void SmartFileSystemRenamedEventHandler(object sender, SmartFileSystemRenamedEventArgs e);
+
         /// <summary>
         /// Occurs when a file or directory in the specified System.IO.FileSystemWatcher.Path is changed.
         /// </summary>
-        public event FileSystemEventHandler Changed;
+        public event SmartFileSystemEventHandler Changed;
 
         /// <summary>
         /// Occurs when a file or directory in the specified System.IO.FileSystemWatcher.Path is created.
         /// </summary>
-        public event FileSystemEventHandler Created;
+        public event SmartFileSystemEventHandler Created;
 
         /// <summary>
         /// Occurs when a file or directory in the specified System.IO.FileSystemWatcher.Path is deleted.
         /// </summary>
-        public event FileSystemEventHandler Deleted;
+        public event SmartFileSystemEventHandler Deleted;
 
         /// <summary>
         /// Occurs when the internal buffer overflows.
@@ -301,7 +385,7 @@ namespace menelabs.core
         /// <summary>
         /// Occurs when a file or directory in the specified System.IO.FileSystemWatcher.Path is renamed.
         /// </summary>
-        public event RenamedEventHandler Renamed;
+        public event SmartFileSystemRenamedEventHandler Renamed;
 
         /// <summary>
         /// Begins the initialization of a System.IO.FileSystemWatcher used on a form or used by another component. The initialization occurs at run time.
@@ -331,7 +415,7 @@ namespace menelabs.core
         /// Raises the System.IO.FileSystemWatcher.Changed event.
         /// </summary>
         /// <param name="e">A System.IO.FileSystemEventArgs that contains the event data.</param>
-        protected void OnChanged(FileSystemEventArgs e)
+        protected void OnChanged(SmartFileSystemEventArgs e)
         {
             if (Changed != null)
                 Changed(this, e);
@@ -341,7 +425,7 @@ namespace menelabs.core
         /// Raises the System.IO.FileSystemWatcher.Created event.
         /// </summary>
         /// <param name="e">A System.IO.FileSystemEventArgs that contains the event data.</param>
-        protected void OnCreated(FileSystemEventArgs e)
+        protected void OnCreated(SmartFileSystemEventArgs e)
         {
             if (Created != null)
                 Created(this, e);
@@ -351,7 +435,7 @@ namespace menelabs.core
         /// Raises the System.IO.FileSystemWatcher.Deleted event.
         /// </summary>
         /// <param name="e">A System.IO.FileSystemEventArgs that contains the event data.</param>
-        protected void OnDeleted(FileSystemEventArgs e)
+        protected void OnDeleted(SmartFileSystemEventArgs e)
         {
             if (Deleted != null)
                 Deleted(this, e);
@@ -371,7 +455,7 @@ namespace menelabs.core
         /// Raises the System.IO.FileSystemWatcher.Renamed event.
         /// </summary>
         /// <param name="e">A System.IO.RenamedEventArgs that contains the event data.</param>
-        protected void OnRenamed(RenamedEventArgs e)
+        protected void OnRenamed(SmartFileSystemRenamedEventArgs e)
         {
             if (Renamed != null)
                 Renamed(this, e);
@@ -556,28 +640,47 @@ namespace menelabs.core
         {
             if ((deQueue != null) && (deQueue.Count > 0))
             {
-                DelayedEvent de;
+                DelayedEvent de = null;
+                SmartFileSystemEventArgs eArgs = null;
+                SmartFileSystemRenamedEventArgs reArgs = null;
+
                 var deQueueClone = (Queue)deQueue.Clone();
+                var deConsolidated = new List<FileSystemEventArgs>();
+
+                while (deQueueClone.Count > 0)
+                {
+                    de = deQueueClone.Dequeue() as DelayedEvent;
+                    deConsolidated.Add(de.Args);
+                }
+                
                 while (deQueue.Count > 0)
                 {
                     de = deQueue.Dequeue() as DelayedEvent;
+
+                    if (de.Args.ChangeType == WatcherChangeTypes.Renamed)
+                    {
+                        reArgs = new SmartFileSystemRenamedEventArgs(de.Args as RenamedEventArgs);
+                        reArgs.ConsolidatedEvents = deConsolidated;
+                    }
+                    else
+                    {
+                        eArgs = new SmartFileSystemEventArgs(de.Args);
+                        eArgs.ConsolidatedEvents = deConsolidated;
+                    }
+
                     switch (de.Args.ChangeType)
                     {
                         case WatcherChangeTypes.Changed:
-                            OnChanged(de.Args);
+                            OnChanged(eArgs);
                             break;
                         case WatcherChangeTypes.Created:
-                            OnCreated(de.Args);
+                            OnCreated(eArgs);
                             break;
                         case WatcherChangeTypes.Deleted:
-                            // Discard deleted event if the same file is renamed right after
-                            if (!de.IsAlsoRenamed(deQueueClone))
-                            {
-                                OnDeleted(de.Args);
-                            }
+                            OnDeleted(eArgs);
                             break;
                         case WatcherChangeTypes.Renamed:
-                            OnRenamed(de.Args as RenamedEventArgs);
+                            OnRenamed(reArgs);
                             break;
                     }
                 }

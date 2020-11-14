@@ -8,7 +8,7 @@ using System.ServiceProcess;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace SuncatService.Monitors.CustomFileSystemWatcher
+namespace SuncatService.Monitors.SmartFileSystemWatcher
 {
     public class VolumeWatcher : NativeWindow
     {

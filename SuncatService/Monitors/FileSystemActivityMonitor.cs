@@ -1,79 +1,100 @@
 ﻿using Cassia;
 using IWshRuntimeLibrary;
 using LeanWork.IO.FileSystem;
+using menelabs.core;
+using Microsoft.Win32;
 using SuncatObjects;
-using SuncatService.Monitors.CustomFileSystemWatcher;
+using SuncatService.Monitors.SmartFileSystemWatcher;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reactive.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace SuncatService.Monitors
 {
-    public static class Extensions
-    {
-        public static IObservable<T> BufferUntilInactive<T>(this IObservable<T> stream, TimeSpan delay)
-        {
-            var closes = stream.Throttle(delay);
-            return stream.Window(() => closes).SelectMany(x => x.FirstAsync());
-        }
-    }
-
     public static class FileSystemActivityMonitor
     {
         private static readonly string serviceName = new ProjectInstaller().ServiceInstaller.ServiceName;
         private static readonly string rootDrive = Path.GetPathRoot(Environment.SystemDirectory);
         private static readonly string serviceAppData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), serviceName);
+        private static readonly IEnumerable<string> fileTypeKeyNames;
         private static VolumeWatcher volumeWatcher;
         private static Dictionary<string, RecoveringFileSystemWatcher> fileSystemWatchers;
         private static Thread recentFilesChecker;
 
         public static event TrackEventHandler Track;
 
-        private static IObservable<FileSystemEventArgs>[] CreateSourcesNormalMode(BufferingFileSystemWatcher watcher)
+        static FileSystemActivityMonitor()
         {
-            return new[]
+            try
             {
-                Observable.FromEventPattern<FileSystemEventHandler, FileSystemEventArgs>(
-                        h => watcher.Created += h,
-                        h => watcher.Created -= h)
-                        .Select(ev => ev.EventArgs),
+                fileTypeKeyNames = Registry.ClassesRoot.GetSubKeyNames().Where(k => k.IndexOf(".") == 0);
+            }
+            catch (Exception ex)
+            {
+                #if DEBUG
+                    Debug.WriteLine(ex);
+                    
+                    if (ex.InnerException != null)
+                        Debug.WriteLine(ex.InnerException);
+                #else
+                    Trace.WriteLine(ex);
 
-                Observable.FromEventPattern<FileSystemEventHandler, FileSystemEventArgs>(
-                        h => watcher.Deleted += h,
-                        h => watcher.Deleted -= h)
-                        .Select(ev => ev.EventArgs),
+                    if (ex.InnerException != null)
+                        Trace.WriteLine(ex.InnerException);
+                #endif
+            }
+        }
 
-                Observable.FromEventPattern<FileSystemEventHandler, FileSystemEventArgs>(
-                        h => watcher.Changed += h,
-                        h => watcher.Changed -= h)
-                        .Select(ev => ev.EventArgs),
+        private static bool IsAssociatedFileType(string file)
+        {
+            try
+            {
+                if (fileTypeKeyNames != null)
+                {
+                    return fileTypeKeyNames.Any(k => file.EndsWith(k));
+                }
+            }
+            catch (Exception ex)
+            {
+                #if DEBUG
+                    Debug.WriteLine(ex);
+                    
+                    if (ex.InnerException != null)
+                        Debug.WriteLine(ex.InnerException);
+                #else
+                    Trace.WriteLine(ex);
 
-                Observable.FromEventPattern<RenamedEventHandler, FileSystemEventArgs>(
-                        h => watcher.Renamed += h,
-                        h => watcher.Renamed -= h)
-                        .Select(ev => ev.EventArgs),
-            };
+                    if (ex.InnerException != null)
+                        Trace.WriteLine(ex.InnerException);
+                #endif
+            }
+
+            return false;
         }
 
         public static bool IgnoreEventCallback(SuncatLog log)
         {
             var ignored = false;
 
-            Func<SuncatLogEvent, string, bool> ignoreFilePatterns = delegate (SuncatLogEvent logEvent, string path)
+            Func<SuncatLogEvent, string, string, bool> ignoreFilePatterns = delegate (SuncatLogEvent logEvent, string path, string oldPath)
             {
                 if (path != null && path.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                 {
                     return false;
                 }
 
-                var manager = new TerminalServicesManager();
+                if (oldPath != null && oldPath.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
+                {
+                    return false;
+                }
 
+                var manager = new TerminalServicesManager();
+                
                 ignored |= Regex.IsMatch(path, $@"^{rootDrive}Users\[^\]+\AppData\".Replace(@"\", @"\\"), RegexOptions.IgnoreCase);
                 ignored |= path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.Windows), StringComparison.OrdinalIgnoreCase);
                 ignored |= path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), StringComparison.OrdinalIgnoreCase);
@@ -94,18 +115,23 @@ namespace SuncatService.Monitors
                             && !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase));
                 ignored |= (path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), StringComparison.OrdinalIgnoreCase)
                             && !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase));
-
+                
                 return ignored;
             };
 
             if (log.Data1 != null)
             {
-                ignored |= ignoreFilePatterns(log.Event, log.Data1);
+                ignored |= ignoreFilePatterns(log.Event, log.Data1, null);
             }
 
             if (log.Data2 != null)
             {
-                ignored |= ignoreFilePatterns(log.Event, log.Data2);
+                ignored |= ignoreFilePatterns(log.Event, log.Data2, null);
+            }
+
+            if (log.Event == SuncatLogEvent.RenameFile)
+            {
+                ignored |= ignoreFilePatterns(log.Event, log.Data1, log.Data2);
             }
 
             return ignored;
@@ -359,18 +385,21 @@ namespace SuncatService.Monitors
 
         private static void FileSystemEventHandler(object sender, FileSystemEventArgs e)
         {
-            var log = new SuncatLog();
-
-            log.Event = e.ChangeType.ToSuncatLogEvent();
+            var originalEvent = e.ChangeType.ToSuncatLogEvent();
 
             // Only log files, not directories (don't check for files exist on delete)
-            if (log.Event == SuncatLogEvent.DeleteFile || System.IO.File.Exists(e.FullPath))
+            if (originalEvent == SuncatLogEvent.DeleteFile || System.IO.File.Exists(e.FullPath))
             {
+                var eArgs = e as SmartFileSystemEventArgs;
+                var reArgs = e as SmartFileSystemRenamedEventArgs;
+
                 var te = new TrackEventArgs();
+                var log = new SuncatLog();
                 
+                log.Event = originalEvent;
                 log.DateTime = DateTime.Now;
-            
-                switch (log.Event)
+                
+                switch (originalEvent)
                 {
                     case SuncatLogEvent.CreateFile:
                     case SuncatLogEvent.ChangeFile:
@@ -410,7 +439,7 @@ namespace SuncatService.Monitors
                             {
                                 log.Event = SuncatLogEvent.CopyFile;
                                 log.Data1 = copiedFile;
-                                log.Data2 = e.FullPath;
+                                log.Data2 = eArgs.FullPath;
 
                                 try
                                 {
@@ -420,7 +449,7 @@ namespace SuncatService.Monitors
                                 {
                                     #if DEBUG
                                         Debug.WriteLine(ex);
-                                           
+                                        
                                         if (ex.InnerException != null)
                                             Debug.WriteLine(ex.InnerException);
                                     #else
@@ -437,76 +466,102 @@ namespace SuncatService.Monitors
                             }
                             else
                             {
-                                log.Data1 = e.FullPath;
+                                log.Data1 = eArgs.FullPath;
                             }
                         }
                         break;
 
                     case SuncatLogEvent.RenameFile:
                         {
-                            var rea = (RenamedEventArgs)e;
+                            var isOldFileTypeAssociated = IsAssociatedFileType(reArgs.OldFullPath);
+                            var isNewFileTypeAssociated = IsAssociatedFileType(reArgs.FullPath);
 
-                            if (Path.GetExtension(rea.OldFullPath).Equals(Path.GetExtension(rea.FullPath), StringComparison.OrdinalIgnoreCase))
+                            // Only 1 operation on the file (rename in this case), treat it as RenameFile, else treat is as ChangeFile
+                            if ((isOldFileTypeAssociated && isNewFileTypeAssociated && Path.GetExtension(reArgs.OldFullPath).Equals(Path.GetExtension(reArgs.FullPath), StringComparison.OrdinalIgnoreCase) && reArgs.SameFileEventCount() == 1)
+                                 || fileTypeKeyNames == null)
                             {
-                                log.Data1 = rea.OldFullPath;
-                                log.Data2 = rea.FullPath;
+                                log.Data1 = reArgs.OldFullPath;
+                                log.Data2 = reArgs.FullPath;
                             }
-                            else
+                            else if (!isOldFileTypeAssociated && isNewFileTypeAssociated)
                             {
                                 log.Event = SuncatLogEvent.ChangeFile;
-                                log.Data1 = rea.FullPath;
+                                log.Data1 = reArgs.FullPath;
+                            }
+                            else // Discard rename event if the file extension is unknown
+                            {
+                                log.Event = SuncatLogEvent.None;
                             }
                         }
                         break;
 
                     default:
                         {
-                            log.Data1 = e.FullPath;
+                            log.Data1 = eArgs.FullPath;
                         }
                         break;
                 }
 
-                try
+                if (log.Event != SuncatLogEvent.None)
                 {
-                    log.Data3 += volumeWatcher.DriveList[e.FullPath.Substring(0, 1)].DriveType.ToString();
-                }
-                catch (Exception ex)
-                {
-                    #if DEBUG
-                        Debug.WriteLine(ex);
-                        
-                        if (ex.InnerException != null)
-                            Debug.WriteLine(ex.InnerException);
-                    #else
-                        Trace.WriteLine(ex);
-
-                        if (ex.InnerException != null)
-                            Trace.WriteLine(ex.InnerException);
-                    #endif
-                }
-
-                te.LogData = log;
-
-                // The ignore part of these events are processed in the custom FileSystemWatcher's core
-                switch (log.Event)
-                {
-                    case SuncatLogEvent.CreateFile:
-                    case SuncatLogEvent.DeleteFile:
-                    case SuncatLogEvent.ChangeFile:
-                    case SuncatLogEvent.RenameFile:
+                    try
+                    {
+                        if (originalEvent == SuncatLogEvent.RenameFile)
                         {
-                            Track?.Invoke(null, te);
+                            log.Data3 += volumeWatcher.DriveList[reArgs.FullPath.Substring(0, 1)].DriveType.ToString();
                         }
-                        break;
-
-                    default:
+                        else
                         {
-                            if (!IgnoreEventCallback(log))
+                            log.Data3 += volumeWatcher.DriveList[eArgs.FullPath.Substring(0, 1)].DriveType.ToString();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        #if DEBUG
+                            Debug.WriteLine(ex);
+                            
+                            if (ex.InnerException != null)
+                                Debug.WriteLine(ex.InnerException);
+                        #else
+                            Trace.WriteLine(ex);
+                            
+                            if (ex.InnerException != null)
+                                Trace.WriteLine(ex.InnerException);
+                        #endif
+                    }
+
+                    te.LogData = log;
+
+                    // The ignore part of these events are processed in the custom FileSystemWatcher's core
+                    switch (log.Event)
+                    {
+                        case SuncatLogEvent.CreateFile:
+                        case SuncatLogEvent.ChangeFile:
+                        case SuncatLogEvent.RenameFile:
                             {
                                 Track?.Invoke(null, te);
                             }
-                        }
-                        break;
+                            break;
+
+                        case SuncatLogEvent.DeleteFile:
+                            {
+                                // Discard deleted event if the same file is renamed right after
+                                if (!eArgs.HasEvent(WatcherChangeTypes.Renamed))
+                                {
+                                    Track?.Invoke(null, te);
+                                }
+                            }
+                            break;
+
+                        default:
+                            {
+                                if (!IgnoreEventCallback(log))
+                                {
+                                    Track?.Invoke(null, te);
+                                }
+                            }
+                            break;
+                    }
                 }
             }
         }
