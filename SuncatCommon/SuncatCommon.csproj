@@ -7,8 +7,8 @@
     <ProjectGuid>{63C3AEF5-1057-4481-960B-9B841A2F1931}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>SuncatObjects</RootNamespace>
-    <AssemblyName>SuncatObjects</AssemblyName>
+    <RootNamespace>SuncatCommon</RootNamespace>
+    <AssemblyName>SuncatCommon</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -40,6 +40,7 @@
   <ItemGroup>
     <Compile Include="SuncatLog.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SuncatUtilities.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />

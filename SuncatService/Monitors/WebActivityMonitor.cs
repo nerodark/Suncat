@@ -1,7 +1,7 @@
 ﻿using Cassia;
 using PListNet;
 using PListNet.Nodes;
-using SuncatObjects;
+using SuncatCommon;
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
@@ -35,18 +35,6 @@ namespace SuncatService.Monitors
         private static Thread edgeHistoryChecker;
 
         public static event TrackEventHandler Track;
-
-        private static string GetMD5HashFromFile(string filename)
-        {
-            using (var md5 = MD5.Create())
-            {
-                using (var stream = File.Open(filename, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                {
-                    var hash = md5.ComputeHash(stream);
-                    return BitConverter.ToString(hash);
-                }
-            }
-        }
 
         private static string GetFirefoxDefaultProfile(string dataDir)
         {
@@ -107,7 +95,7 @@ namespace SuncatService.Monitors
 
                                 if (File.Exists(database) && File.Exists($"{database}-wal"))
                                 {
-                                    var databaseMD5Hash = GetMD5HashFromFile($"{database}-wal");
+                                    var databaseMD5Hash = SuncatUtilities.GetMD5HashFromFile($"{database}-wal");
 
                                     if (databaseMD5Hash != lastDatabaseMD5Hash)
                                     {
@@ -119,7 +107,7 @@ namespace SuncatService.Monitors
                                         {
                                             connection.Open();
 
-                                            using (var command = new SQLiteCommand("select mp.url, mp.title, strftime('%Y-%m-%d %H:%M:%f', substr(mhv.visit_date, 1, 17) / 1000000.0, 'unixepoch', 'localtime') as visit_date from moz_places mp join moz_historyvisits mhv on mhv.place_id = mp.id order by visit_date desc, mhv.id desc", connection))
+                                            using (var command = new SQLiteCommand("select mp.url, mp.title, strftime('%Y-%m-%d %H:%M:%f', substr(mhv.visit_date, 1, 17) / 1000000.0, 'unixepoch', 'localtime') as visit_date from moz_places mp join moz_historyvisits mhv on mhv.place_id = mp.id where mp.hidden = 0 order by visit_date desc, mhv.id desc", connection))
                                             {
                                                 using (var reader = command.ExecuteReader())
                                                 {
@@ -127,39 +115,46 @@ namespace SuncatService.Monitors
 
                                                     if (reader.HasRows)
                                                     {
+                                                        string lastUrl = null;
+
                                                         while (reader.Read())
                                                         {
                                                             var url = Convert.ToString(reader["url"]);
                                                             var title = Convert.ToString(reader["title"]);
                                                             var urlTime = Convert.ToDateTime(reader["visit_date"]);
 
-                                                            if (lastUrlTime.HasValue)
+                                                            if (url != lastUrl)
                                                             {
-                                                                if (urlTime >= lastUrlTime)
+                                                                if (lastUrlTime.HasValue)
                                                                 {
-                                                                    if (newUrls.Count == 0)
+                                                                    if (urlTime >= lastUrlTime)
                                                                     {
-                                                                        firstUrlTime = urlTime;
+                                                                        if (newUrls.Count == 0)
+                                                                        {
+                                                                            firstUrlTime = urlTime;
+                                                                        }
+
+                                                                        if (urlTime > lastUrlTime && url.StartsWith("http"))
+                                                                        {
+                                                                            var tuple = new Tuple<string, string>(url, string.IsNullOrWhiteSpace(title) ? null : title.Trim());
+
+                                                                            newUrls.Insert(0, tuple);
+                                                                        }
                                                                     }
-
-                                                                    if (urlTime > lastUrlTime && url.StartsWith("http"))
+                                                                    else
                                                                     {
-                                                                        var tuple = new Tuple<string, string>(url, string.IsNullOrWhiteSpace(title) ? null : title.Trim());
-
-                                                                        newUrls.Insert(0, tuple);
+                                                                        lastUrlTime = firstUrlTime;
+                                                                        break;
                                                                     }
                                                                 }
                                                                 else
                                                                 {
-                                                                    lastUrlTime = firstUrlTime;
+                                                                    lastUrlTime = urlTime;
                                                                     break;
                                                                 }
                                                             }
-                                                            else
-                                                            {
-                                                                lastUrlTime = urlTime;
-                                                                break;
-                                                            }
+
+                                                            lastUrl = url;
                                                         }
                                                     }
                                                     else
@@ -247,7 +242,7 @@ namespace SuncatService.Monitors
 
                             if (File.Exists(database))
                             {
-                                var databaseMD5Hash = GetMD5HashFromFile(database);
+                                var databaseMD5Hash = SuncatUtilities.GetMD5HashFromFile(database);
 
                                 if (databaseMD5Hash != lastDatabaseMD5Hash)
                                 {
@@ -258,7 +253,7 @@ namespace SuncatService.Monitors
                                     {
                                         connection.Open();
 
-                                        using (var command = new SQLiteCommand("select u.url, u.title, strftime('%Y-%m-%d %H:%M:%f', substr(v.visit_time, 1, 17) / 1000000.0 - 11644473600, 'unixepoch', 'localtime') as visit_time from urls u join visits v on v.url = u.id order by visit_time desc, v.id desc", connection))
+                                        using (var command = new SQLiteCommand("select u.url, u.title, strftime('%Y-%m-%d %H:%M:%f', substr(v.visit_time, 1, 17) / 1000000.0 - 11644473600, 'unixepoch', 'localtime') as visit_time from urls u join visits v on v.url = u.id where u.hidden = 0 order by visit_time desc, v.id desc", connection))
                                         {
                                             using (var reader = command.ExecuteReader())
                                             {
@@ -266,39 +261,46 @@ namespace SuncatService.Monitors
 
                                                 if (reader.HasRows)
                                                 {
+                                                    string lastUrl = null;
+
                                                     while (reader.Read())
                                                     {
                                                         var url = Convert.ToString(reader["url"]);
                                                         var title = Convert.ToString(reader["title"]);
                                                         var urlTime = Convert.ToDateTime(reader["visit_time"]);
 
-                                                        if (lastUrlTime.HasValue)
+                                                        if (url != lastUrl)
                                                         {
-                                                            if (urlTime >= lastUrlTime)
+                                                            if (lastUrlTime.HasValue)
                                                             {
-                                                                if (newUrls.Count == 0)
+                                                                if (urlTime >= lastUrlTime)
                                                                 {
-                                                                    firstUrlTime = urlTime;
+                                                                    if (newUrls.Count == 0)
+                                                                    {
+                                                                        firstUrlTime = urlTime;
+                                                                    }
+
+                                                                    if (urlTime > lastUrlTime && url.StartsWith("http"))
+                                                                    {
+                                                                        var tuple = new Tuple<string, string>(url, string.IsNullOrWhiteSpace(title) ? null : title.Trim());
+
+                                                                        newUrls.Insert(0, tuple);
+                                                                    }
                                                                 }
-
-                                                                if (urlTime > lastUrlTime && url.StartsWith("http"))
+                                                                else
                                                                 {
-                                                                    var tuple = new Tuple<string, string>(url, string.IsNullOrWhiteSpace(title) ? null : title.Trim());
-
-                                                                    newUrls.Insert(0, tuple);
+                                                                    lastUrlTime = firstUrlTime;
+                                                                    break;
                                                                 }
                                                             }
                                                             else
                                                             {
-                                                                lastUrlTime = firstUrlTime;
+                                                                lastUrlTime = urlTime;
                                                                 break;
                                                             }
                                                         }
-                                                        else
-                                                        {
-                                                            lastUrlTime = urlTime;
-                                                            break;
-                                                        }
+
+                                                        lastUrl = url;
                                                     }
                                                 }
                                                 else
@@ -385,7 +387,7 @@ namespace SuncatService.Monitors
 
                             if (File.Exists(database))
                             {
-                                var databaseMD5Hash = GetMD5HashFromFile(database);
+                                var databaseMD5Hash = SuncatUtilities.GetMD5HashFromFile(database);
 
                                 if (databaseMD5Hash != lastDatabaseMD5Hash)
                                 {
@@ -399,11 +401,13 @@ namespace SuncatService.Monitors
 
                                     if (urlsNode.Count > 0)
                                     {
+                                        string lastUrl = null;
+
                                         foreach (var urlNode in urlsNode.OfType<DictionaryNode>().Select(
                                             u => new
                                             {
                                                 Url = ((StringNode)u[""]).Value,
-                                                Title = ((StringNode)u["title"]).Value,
+                                                Title = (u.ContainsKey("title") ? ((StringNode)u["title"]).Value : string.Empty),
                                                 LastVisitedDate = Convert.ToDouble(((StringNode)u["lastVisitedDate"]).Value, CultureInfo.InvariantCulture),
                                             }).OrderByDescending(u => u.LastVisitedDate))
                                         {
@@ -411,33 +415,38 @@ namespace SuncatService.Monitors
                                             var title = urlNode.Title;
                                             var urlTime = urlNode.LastVisitedDate;
 
-                                            if (lastUrlTime.HasValue)
+                                            if (url != lastUrl)
                                             {
-                                                if (urlTime >= lastUrlTime)
+                                                if (lastUrlTime.HasValue)
                                                 {
-                                                    if (newUrls.Count == 0)
+                                                    if (urlTime >= lastUrlTime)
                                                     {
-                                                        firstUrlTime = urlTime;
+                                                        if (newUrls.Count == 0)
+                                                        {
+                                                            firstUrlTime = urlTime;
+                                                        }
+
+                                                        if (urlTime > lastUrlTime && url.StartsWith("http"))
+                                                        {
+                                                            var tuple = new Tuple<string, string>(url, string.IsNullOrWhiteSpace(title) ? null : title.Trim());
+
+                                                            newUrls.Insert(0, tuple);
+                                                        }
                                                     }
-
-                                                    if (urlTime > lastUrlTime && url.StartsWith("http"))
+                                                    else
                                                     {
-                                                        var tuple = new Tuple<string, string>(url, string.IsNullOrWhiteSpace(title) ? null : title.Trim());
-
-                                                        newUrls.Insert(0, tuple);
+                                                        lastUrlTime = firstUrlTime;
+                                                        break;
                                                     }
                                                 }
                                                 else
                                                 {
-                                                    lastUrlTime = firstUrlTime;
+                                                    lastUrlTime = urlTime;
                                                     break;
                                                 }
                                             }
-                                            else
-                                            {
-                                                lastUrlTime = urlTime;
-                                                break;
-                                            }
+
+                                            lastUrl = url;
                                         }
                                     }
                                     else

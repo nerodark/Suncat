@@ -1,6 +1,6 @@
 ﻿using Cassia;
 using Microsoft.Win32.TaskScheduler;
-using SuncatObjects;
+using SuncatCommon;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -18,6 +18,7 @@ namespace SuncatService.Monitors
         private static readonly string serviceName = new ProjectInstaller().ServiceInstaller.ServiceName;
         private static readonly string rootDrive = Path.GetPathRoot(Environment.SystemDirectory);
         private static readonly string serviceAppData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), serviceName);
+        private static Dictionary<string, string> lastMutexMD5Hashes = new Dictionary<string, string>();
         private static string hookAssemblyTitle;
         private static string lastSessionUser;
         private static Thread globalKeyboardHook;
@@ -26,6 +27,16 @@ namespace SuncatService.Monitors
         private static Thread globalCopyFilesHook;
         private static Thread globalEdgeHook;
         private static Thread taskChecker;
+        
+
+        static HookActivityMonitor()
+        {
+            lastMutexMD5Hashes.Add("Keyboard", default(string));
+            lastMutexMD5Hashes.Add("Window", default(string));
+            lastMutexMD5Hashes.Add("Clipboard", default(string));
+            lastMutexMD5Hashes.Add("CopyFiles", default(string));
+            lastMutexMD5Hashes.Add("Edge", default(string));
+        }
 
         public static event TrackEventHandler Track;
 
@@ -56,50 +67,57 @@ namespace SuncatService.Monitors
 
                                         if (File.Exists(mapFile))
                                         {
-                                            Directory.CreateDirectory($@"{serviceAppData}\Hook");
-                                            File.Copy(mapFile, $@"{serviceAppData}\Hook\{mapName}", true);
+                                            var mutexMD5Hash = SuncatUtilities.GetMD5HashFromFile(mapFile);
 
-                                            using (var fileStream = new FileStream($@"{serviceAppData}\Hook\{mapName}", FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
+                                            if (mutexMD5Hash != lastMutexMD5Hashes[type])
                                             {
-                                                if (fileStream.Length > 0)
+                                                Directory.CreateDirectory($@"{serviceAppData}\Hook");
+                                                File.Copy(mapFile, $@"{serviceAppData}\Hook\{mapName}", true);
+
+                                                using (var fileStream = new FileStream($@"{serviceAppData}\Hook\{mapName}", FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
                                                 {
-                                                    using (var map = MemoryMappedFile.CreateFromFile(fileStream, mapName, 0, MemoryMappedFileAccess.ReadWrite, null, HandleInheritability.None, false))
+                                                    if (fileStream.Length > 0)
                                                     {
-                                                        using (var viewStream = map.CreateViewStream())
+                                                        using (var map = MemoryMappedFile.CreateFromFile(fileStream, mapName, 0, MemoryMappedFileAccess.ReadWrite, null, HandleInheritability.None, false))
                                                         {
-                                                            var formatter = new BinaryFormatter();
-                                                            var buffer = new byte[viewStream.Length];
-
-                                                            viewStream.Read(buffer, 0, (int)viewStream.Length);
-
-                                                            if (!buffer.All(b => b == 0))
+                                                            using (var viewStream = map.CreateViewStream())
                                                             {
-                                                                var log = (SuncatLog)formatter.Deserialize(new MemoryStream(buffer));
-                                                                viewStream.Position = 0;
+                                                                var formatter = new BinaryFormatter();
+                                                                var buffer = new byte[viewStream.Length];
 
-                                                                if (log != null && log.Event != SuncatLogEvent.None)
+                                                                viewStream.Read(buffer, 0, (int)viewStream.Length);
+
+                                                                if (!buffer.All(b => b == 0))
                                                                 {
-                                                                    if (log.Event == SuncatLogEvent.CopyFile)
+                                                                    var log = (SuncatLog)formatter.Deserialize(new MemoryStream(buffer));
+                                                                    viewStream.Position = 0;
+
+                                                                    if (log != null && log.Event != SuncatLogEvent.None)
                                                                     {
-                                                                        LastCopiedFiles = log.DataObject as List<SuncatFileInfo>;
-                                                                    }
-                                                                    else
-                                                                    {
-                                                                        var te = new TrackEventArgs();
+                                                                        if (log.Event == SuncatLogEvent.CopyFile)
+                                                                        {
+                                                                            LastCopiedFiles = log.DataObject as List<SuncatFileInfo>;
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            var te = new TrackEventArgs();
 
-                                                                        log.DateTime = DateTime.Now;
-                                                                        te.LogData = log;
+                                                                            log.DateTime = DateTime.Now;
+                                                                            te.LogData = log;
 
-                                                                        Track?.Invoke(null, te);
+                                                                            Track?.Invoke(null, te);
 
-                                                                        viewStream.Write(new byte[viewStream.Length], 0, (int)viewStream.Length);
-                                                                        viewStream.Position = 0;
+                                                                            viewStream.Write(new byte[viewStream.Length], 0, (int)viewStream.Length);
+                                                                            viewStream.Position = 0;
+                                                                        }
                                                                     }
                                                                 }
                                                             }
                                                         }
                                                     }
                                                 }
+
+                                                lastMutexMD5Hashes[type] = mutexMD5Hash;
                                             }
                                         }
                                     }

@@ -1,5 +1,5 @@
 ﻿using Cassia;
-using SuncatObjects;
+using SuncatCommon;
 using SuncatService.Monitors;
 using System;
 using System.Collections.Concurrent;

@@ -11,7 +11,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuncatServiceTestApp", "Sun
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PListNet", "PList-Net\PListNet\PListNet.csproj", "{C1154025-FCAB-40AF-A715-91D10420C321}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuncatObjects", "SuncatObjects\SuncatObjects.csproj", "{63C3AEF5-1057-4481-960B-9B841A2F1931}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuncatCommon", "SuncatCommon\SuncatCommon.csproj", "{63C3AEF5-1057-4481-960B-9B841A2F1931}"
 EndProject
 Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "SuncatSetup", "SuncatSetup\SuncatSetup.vdproj", "{65D2BCB9-3741-46DD-BA61-2497F16D775C}"
 EndProject

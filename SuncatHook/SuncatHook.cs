@@ -1,5 +1,7 @@
 ﻿using RawInput;
-using SuncatObjects;
+using SHDocVw;
+using Shell32;
+using SuncatCommon;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -524,12 +526,51 @@ namespace SuncatHook
 
         private void WindowLoggerAction(string mapName, FileStream fileStream)
         {
-            var windowHandle = GetForegroundWindow();
+            var currentWindowHandle = GetForegroundWindow();
                 
-            if (windowHandle != IntPtr.Zero)
+            if (currentWindowHandle != IntPtr.Zero)
             {
-                var currentActiveWindowTitle = GetActiveWindowTitle(windowHandle);
-                    
+                string currentActiveWindowTitle = null;
+                var activeProcessFileName = GetActiveProcessId(currentWindowHandle);
+                var executablePath = GetExecutablePath(activeProcessFileName);
+                var explorer = false;
+
+                if (executablePath != null && executablePath.Equals(@"C:\Windows\explorer.exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    explorer = true;
+
+                    try
+                    {
+                        ShellWindows shellWindows = new ShellWindows();
+
+                        foreach (InternetExplorer window in shellWindows)
+                        {
+                            if (new IntPtr(window.HWND) == currentWindowHandle)
+                            {
+                                currentActiveWindowTitle = ((IShellFolderViewDual2)window.Document).Folder.Items().Item().Path;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        #if DEBUG
+                            Debug.WriteLine(ex);
+                            
+                            if (ex.InnerException != null)
+                                Debug.WriteLine(ex.InnerException);
+                        #else
+                            Trace.WriteLine(ex);
+
+                            if (ex.InnerException != null)
+                                Trace.WriteLine(ex.InnerException);
+                        #endif
+                    }
+                }
+                else
+                {
+                    currentActiveWindowTitle = GetActiveWindowTitle(currentWindowHandle);
+                }
+
                 if (currentActiveWindowTitle != lastActiveWindowTitle)
                 {
                     using (var memoryStream = new MemoryStream())
@@ -542,10 +583,7 @@ namespace SuncatHook
                         {
                             using (var viewStream = map.CreateViewStream())
                             {
-                                var activeProcessFileName = GetActiveProcessId(windowHandle);
-                                var executablePath = GetExecutablePath(activeProcessFileName);
-
-                                if (executablePath != null && executablePath.Equals(@"C:\Windows\explorer.exe", StringComparison.OrdinalIgnoreCase))
+                                if (explorer)
                                 {
                                     if (!string.IsNullOrWhiteSpace(currentActiveWindowTitle))
                                     {

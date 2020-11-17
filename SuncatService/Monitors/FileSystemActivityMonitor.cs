@@ -3,7 +3,7 @@ using IWshRuntimeLibrary;
 using LeanWork.IO.FileSystem;
 using menelabs.core;
 using Microsoft.Win32;
-using SuncatObjects;
+using SuncatCommon;
 using SuncatService.Monitors.SmartFileSystemWatcher;
 using System;
 using System.Collections.Generic;
@@ -115,6 +115,7 @@ namespace SuncatService.Monitors
                             && !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase));
                 ignored |= (path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), StringComparison.OrdinalIgnoreCase)
                             && !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase));
+                ignored |= path.Contains(@"\.");
                 
                 return ignored;
             };
