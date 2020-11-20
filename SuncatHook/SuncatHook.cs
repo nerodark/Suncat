@@ -537,8 +537,6 @@ namespace SuncatHook
 
                 if (executablePath != null && executablePath.Equals(@"C:\Windows\explorer.exe", StringComparison.OrdinalIgnoreCase))
                 {
-                    explorer = true;
-
                     try
                     {
                         ShellWindows shellWindows = new ShellWindows();
@@ -548,6 +546,14 @@ namespace SuncatHook
                             if (new IntPtr(window.HWND) == currentWindowHandle)
                             {
                                 currentActiveWindowTitle = ((IShellFolderViewDual2)window.Document).Folder.Items().Item().Path;
+
+                                // Test if the window title is a valid path because explorer.exe is also used to display non-directory windows like Control Panel stuff, etc
+                                if (Regex.IsMatch(currentActiveWindowTitle, @"^([A-Z]:\\|\\\\)", RegexOptions.IgnoreCase))
+                                {
+                                    explorer = true;
+                                }
+
+                                break;
                             }
                         }
                     }
@@ -566,7 +572,8 @@ namespace SuncatHook
                         #endif
                     }
                 }
-                else
+
+                if (!explorer)
                 {
                     currentActiveWindowTitle = GetActiveWindowTitle(currentWindowHandle);
                 }

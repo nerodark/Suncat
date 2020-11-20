@@ -17,7 +17,7 @@ Event|Data
 CreateFile|Files created on any drive excluding some system folders to reduce noise (supports fixed and removable drives also tags the type of drive on which it happened)
 DeleteFile|Files deleted on any drive excluding some system folders to reduce noise (supports fixed and removable drives also tags the type of drive on which it happened)
 ChangeFile|Files modified on any drive excluding some system folders to reduce noise (supports fixed and removable drives also tags the type of drive on which it happened)
-MoveFile|Files moved on any drive excluding some system folders to reduce noise (supports fixed and removable drives also tags the type of drive on which it happened)
+RenameFile|Files renamed on any drive excluding some system folders to reduce noise (supports fixed and removable drives also tags the type of drive on which it happened)
 OpenFile|Files opened and read on any drive excluding some system folders to reduce noise (supports fixed, removable drives and network drives also tags the type of drive on which it happened)
 CopyFile|Files copied on any drive excluding system some folders to reduce noise (supports fixed and removable drives also tags the type of drive on which it happened)
 OpenURL|All URLs visited by popular web browsers (supports Chrome-based, Mozilla-based, Edge browsers even the old Safari for Windows except portable browsers)
