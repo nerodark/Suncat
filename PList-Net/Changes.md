@@ -1,5 +1,22 @@
 ﻿# Change log
 
+## 3.2
+ - fixed writing of boolean values (addressed issue #20)
+
+## 3.1
+ - fixed parsing of binary UID values
+
+## 3.0
+ - fixed a number of binary PList parsing bugs
+ - fixed writing of unicode strings in XML format
+ - converted to netstandard1.0
+
+## 2.0.5
+ - project cleanup (removed unused file)
+
+## 2.0.4
+ - fixed handling of empty arrays
+
 ## 2.0.3
  - fixed issue where invalid PList XML files were generated
 

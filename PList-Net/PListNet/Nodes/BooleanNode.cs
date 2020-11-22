@@ -62,6 +62,9 @@ namespace PListNet.Nodes
 		/// <param name="writer">The <see cref="T:System.Xml.XmlWriter"/> stream to which the object is serialized.</param>
 		internal override void WriteXml(XmlWriter writer)
 		{
+			// writing value as raw because Apple's parser expects no
+			// space before the closing tag, and the XmlWrites inserts one
+			//writer.WriteRaw($"<{ToXmlString()}/>");
 			writer.WriteStartElement(ToXmlString());
 			writer.WriteEndElement();
 		}
@@ -69,7 +72,7 @@ namespace PListNet.Nodes
 		/// <summary>
 		/// Parses the specified value from a given string, read from Xml.
 		/// </summary>
-		/// <param name="data">The string whis is parsed.</param>
+		/// <param name="data">The string which is parsed.</param>
 		internal override void Parse(string data)
 		{
 			Value = data == "true";

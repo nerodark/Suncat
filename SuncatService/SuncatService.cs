@@ -81,9 +81,9 @@ namespace SuncatService
 
             while (logs.TryTake(out log, -1))
             {
-                var manager = new TerminalServicesManager();
+                var session = SuncatUtilities.GetActiveSession();
 
-                if (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName))
+                if (session != null && !string.IsNullOrEmpty(session.UserName))
                 {
                     var text =
                         $"[{log.DateTime}] {log.Event}: " +
@@ -193,7 +193,7 @@ namespace SuncatService
             }
         }
 
-        private async void InsertToDatabase(TerminalServicesManager manager, SuncatLog log)
+        private async void InsertToDatabase(ITerminalServicesSession session, SuncatLog log)
         {
             try
             {
@@ -313,7 +313,7 @@ namespace SuncatService
                         command.Parameters.AddWithValue("@Data2", string.IsNullOrWhiteSpace(data2) ? (object)DBNull.Value : data2);
                         command.Parameters.AddWithValue("@Data3", string.IsNullOrWhiteSpace(data3) ? (object)DBNull.Value : data3);
                         command.Parameters.AddWithValue("@ComputerName", Environment.MachineName ?? string.Empty);
-                        command.Parameters.AddWithValue("@UserName", manager.CurrentSession.UserName ?? string.Empty);
+                        command.Parameters.AddWithValue("@UserName", session.UserName ?? string.Empty);
                         command.Parameters.AddWithValue("@LocalIp", string.IsNullOrEmpty(localIp) ? (object)DBNull.Value : localIp);
                         command.Parameters.AddWithValue("@MacAddress", string.IsNullOrEmpty(macAddress) ? (object)DBNull.Value : macAddress);
 

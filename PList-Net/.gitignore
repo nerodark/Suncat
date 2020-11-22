@@ -4,3 +4,5 @@
 packages
 *.suo
 /.vs
+*.user
+.idea

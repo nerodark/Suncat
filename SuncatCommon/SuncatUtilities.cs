@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Cassia;
+using System;
 using System.IO;
 using System.Security.Cryptography;
 
@@ -16,6 +17,31 @@ namespace SuncatCommon
                     return BitConverter.ToString(hash);
                 }
             }
+        }
+
+        public static ITerminalServicesSession GetActiveSession()
+        {
+            ITerminalServicesSession activeSession = null;
+            var manager = new TerminalServicesManager();
+
+            if (manager != null)
+            {
+                using (var server = manager.GetLocalServer())
+                {
+                    server.Open();
+
+                    foreach (var session in server.GetSessions())
+                    {
+                        if (session.ConnectionState == ConnectionState.Active)
+                        {
+                            activeSession = session;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return activeSession;
         }
     }
 }

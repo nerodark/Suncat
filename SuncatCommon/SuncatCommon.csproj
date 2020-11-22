@@ -45,5 +45,12 @@
   <ItemGroup>
     <Reference Include="System" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Cassia\Source\Cassia\Cassia.csproj">
+      <Project>{fa7c09c9-33de-459e-8299-de57834cec15}</Project>
+      <Name>Cassia</Name>
+      <Private>False</Private>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

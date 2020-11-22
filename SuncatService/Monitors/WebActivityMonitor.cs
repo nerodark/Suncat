@@ -1,5 +1,4 @@
-﻿using Cassia;
-using PListNet;
+﻿using PListNet;
 using PListNet.Nodes;
 using SuncatCommon;
 using System;
@@ -80,13 +79,13 @@ namespace SuncatService.Monitors
             {
                 try
                 {
-                    var manager = new TerminalServicesManager();
+                    var session = SuncatUtilities.GetActiveSession();
 
-                    if (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName))
+                    if (session != null && !string.IsNullOrEmpty(session.UserName))
                     {
-                        if (!lastActiveUsernames.ContainsKey(tempFileName) || lastActiveUsernames[tempFileName] == manager.CurrentSession.UserName)
+                        if (!lastActiveUsernames.ContainsKey(tempFileName) || lastActiveUsernames[tempFileName] == session.UserName)
                         {
-                            var realDataDir = dataDir.Replace("[USERNAME]", manager.CurrentSession.UserName);
+                            var realDataDir = dataDir.Replace("[USERNAME]", session.UserName);
                             var profile = GetFirefoxDefaultProfile(realDataDir);
 
                             if (profile != null)
@@ -199,7 +198,7 @@ namespace SuncatService.Monitors
                             lastUrlTime = null;
                         }
 
-                        lastActiveUsernames[tempFileName] = manager.CurrentSession.UserName;
+                        lastActiveUsernames[tempFileName] = session.UserName;
                     }
                 }
                 catch (Exception ex)
@@ -231,13 +230,13 @@ namespace SuncatService.Monitors
             {
                 try
                 {
-                    var manager = new TerminalServicesManager();
+                    var session = SuncatUtilities.GetActiveSession();
 
-                    if (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName))
+                    if (session != null && !string.IsNullOrEmpty(session.UserName))
                     {
-                        if (!lastActiveUsernames.ContainsKey(tempFileName) || lastActiveUsernames[tempFileName] == manager.CurrentSession.UserName)
+                        if (!lastActiveUsernames.ContainsKey(tempFileName) || lastActiveUsernames[tempFileName] == session.UserName)
                         {
-                            var realDataDir = dataDir.Replace("[USERNAME]", manager.CurrentSession.UserName);
+                            var realDataDir = dataDir.Replace("[USERNAME]", session.UserName);
                             var database = $@"{realDataDir}\History";
 
                             if (File.Exists(database))
@@ -344,7 +343,7 @@ namespace SuncatService.Monitors
                             lastUrlTime = null;
                         }
 
-                        lastActiveUsernames[tempFileName] = manager.CurrentSession.UserName;
+                        lastActiveUsernames[tempFileName] = session.UserName;
                     }
                 }
                 catch (Exception ex)
@@ -376,13 +375,13 @@ namespace SuncatService.Monitors
             {
                 try
                 {
-                    var manager = new TerminalServicesManager();
+                    var session = SuncatUtilities.GetActiveSession();
 
-                    if (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName))
+                    if (session != null && !string.IsNullOrEmpty(session.UserName))
                     {
-                        if (!lastActiveUsernames.ContainsKey(tempFileName) || lastActiveUsernames[tempFileName] == manager.CurrentSession.UserName)
+                        if (!lastActiveUsernames.ContainsKey(tempFileName) || lastActiveUsernames[tempFileName] == session.UserName)
                         {
-                            var realDataDir = dataDir.Replace("[USERNAME]", manager.CurrentSession.UserName);
+                            var realDataDir = dataDir.Replace("[USERNAME]", session.UserName);
                             var database = $@"{realDataDir}\History.plist";
 
                             if (File.Exists(database))
@@ -487,7 +486,7 @@ namespace SuncatService.Monitors
                             lastUrlTime = null;
                         }
 
-                        lastActiveUsernames[tempFileName] = manager.CurrentSession.UserName;
+                        lastActiveUsernames[tempFileName] = session.UserName;
                     }
                 }
                 catch (Exception ex)
@@ -561,9 +560,9 @@ namespace SuncatService.Monitors
             // Proxy is still a bit unstable after a long uptime, seems to not respond to in browsers and is eating a lot of memory after a few hours up.
             //if (false)
             //{
-            //    EnableFirefoxProxy($@"{rootDrive}Users\{manager.CurrentSession.UserName}\AppData\Roaming\Mozilla\Firefox", false);
-            //    EnableFirefoxProxy($@"{rootDrive}Users\{manager.CurrentSession.UserName}\AppData\Roaming\Moonchild Productions\Pale Moon", false);
-            //    EnableFirefoxProxy($@"{rootDrive}Users\{manager.CurrentSession.UserName}\AppData\Roaming\Mozilla\SeaMonkey", false);
+            //    EnableFirefoxProxy($@"{rootDrive}Users\{session.UserName}\AppData\Roaming\Mozilla\Firefox", false);
+            //    EnableFirefoxProxy($@"{rootDrive}Users\{session.UserName}\AppData\Roaming\Moonchild Productions\Pale Moon", false);
+            //    EnableFirefoxProxy($@"{rootDrive}Users\{session.UserName}\AppData\Roaming\Mozilla\SeaMonkey", false);
             //    StartProxyServer();
             //}
 
@@ -617,9 +616,9 @@ namespace SuncatService.Monitors
         //        if (proxyServer != null)
         //        {
         //            StopProxyServer();
-        //            EnableFirefoxProxy($@"{rootDrive}Users\{manager.CurrentSession.UserName}\AppData\Roaming\Mozilla\Firefox", true);
-        //            EnableFirefoxProxy($@"{rootDrive}Users\{manager.CurrentSession.UserName}\AppData\Roaming\Moonchild Productions\Pale Moon", true);
-        //            EnableFirefoxProxy($@"{rootDrive}Users\{manager.CurrentSession.UserName}\AppData\Roaming\Mozilla\SeaMonkey", true);
+        //            EnableFirefoxProxy($@"{rootDrive}Users\{session.UserName}\AppData\Roaming\Mozilla\Firefox", true);
+        //            EnableFirefoxProxy($@"{rootDrive}Users\{session.UserName}\AppData\Roaming\Moonchild Productions\Pale Moon", true);
+        //            EnableFirefoxProxy($@"{rootDrive}Users\{session.UserName}\AppData\Roaming\Mozilla\SeaMonkey", true);
         //        }
         }
     }

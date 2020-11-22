@@ -1,5 +1,4 @@
-﻿using Cassia;
-using Microsoft.Win32.TaskScheduler;
+﻿using Microsoft.Win32.TaskScheduler;
 using SuncatCommon;
 using System;
 using System.Collections.Generic;
@@ -58,12 +57,12 @@ namespace SuncatService.Monitors
                             {
                                 try
                                 {
-                                    var manager = new TerminalServicesManager();
+                                    var session = SuncatUtilities.GetActiveSession();
 
-                                    if (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName))
+                                    if (session != null && !string.IsNullOrEmpty(session.UserName))
                                     {
                                         var mapName = $@"Suncat{type}HookMap";
-                                        var mapFile = $@"{rootDrive}Users\{manager.CurrentSession.UserName}\AppData\Local\{serviceName}\Hook\{mapName}.data";
+                                        var mapFile = $@"{rootDrive}Users\{session.UserName}\AppData\Local\{serviceName}\Hook\{mapName}.data";
 
                                         if (File.Exists(mapFile))
                                         {
@@ -173,17 +172,17 @@ namespace SuncatService.Monitors
             {
                 try
                 {
-                    var manager = new TerminalServicesManager();
+                    var session = SuncatUtilities.GetActiveSession();
 
-                    if (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName))
+                    if (session != null && !string.IsNullOrEmpty(session.UserName))
                     {
                         using (var ts = new TaskService())
                         {
                             var processes = Process.GetProcessesByName("suncatsat");
 
-                            if (processes.Length > 1 || lastSessionUser != manager.CurrentSession.UserAccount.Value)
+                            if (processes.Length > 1 || lastSessionUser != session.UserAccount.Value)
                             {
-                                lastSessionUser = manager.CurrentSession.UserAccount.Value;
+                                lastSessionUser = session.UserAccount.Value;
 
                                 foreach (var process in processes)
                                 {
@@ -197,7 +196,7 @@ namespace SuncatService.Monitors
                             {
                                 var assemblyLocationPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
 
-                                task = ts.AddTask(hookAssemblyTitle, QuickTriggerType.TaskRegistration, $@"{assemblyLocationPath}\suncatsat.exe", null, manager.CurrentSession.UserAccount.Value, null, TaskLogonType.InteractiveToken, null);
+                                task = ts.AddTask(hookAssemblyTitle, QuickTriggerType.TaskRegistration, $@"{assemblyLocationPath}\suncatsat.exe", null, session.UserAccount.Value, null, TaskLogonType.InteractiveToken, null);
                                 task.Definition.Principal.RunLevel = TaskRunLevel.Highest;
                                 task.Definition.Settings.ExecutionTimeLimit = TimeSpan.Zero;
                                 task.RegisterChanges();

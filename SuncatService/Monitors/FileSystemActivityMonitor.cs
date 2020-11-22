@@ -1,5 +1,4 @@
-﻿using Cassia;
-using IWshRuntimeLibrary;
+﻿using IWshRuntimeLibrary;
 using LeanWork.IO.FileSystem;
 using menelabs.core;
 using Microsoft.Win32;
@@ -93,7 +92,7 @@ namespace SuncatService.Monitors
                     return false;
                 }
 
-                var manager = new TerminalServicesManager();
+                var session = SuncatUtilities.GetActiveSession();
 
                 if (!ignored) ignored |= Regex.IsMatch(path, $@"^{rootDrive}Users\[^\]+\AppData\".Replace(@"\", @"\\"), RegexOptions.IgnoreCase);
                 if (!ignored) ignored |= path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.Windows), StringComparison.OrdinalIgnoreCase);
@@ -104,13 +103,14 @@ namespace SuncatService.Monitors
                 if (!ignored) ignored |= path.IndexOf("System Volume Information", StringComparison.OrdinalIgnoreCase) > -1;
                 if (!ignored) ignored |= path.IndexOf("WindowsApps", StringComparison.OrdinalIgnoreCase) > -1;
                 if (!ignored) ignored |= path.IndexOf("SystemApps", StringComparison.OrdinalIgnoreCase) > -1;
+                if (!ignored) ignored |= path.IndexOf("MicrosoftEdgeBackups", StringComparison.OrdinalIgnoreCase) > -1; 
                 if (!ignored) ignored |= path.EndsWith("desktop.ini", StringComparison.OrdinalIgnoreCase);
                 if (!ignored) ignored |= (Path.GetFileName(path).StartsWith("~") && logEvent != SuncatLogEvent.RenameFile);
                 if (!ignored) ignored |= (Path.GetFileName(path).EndsWith("~") && logEvent != SuncatLogEvent.RenameFile);
                 if (!ignored) ignored |= (Path.GetExtension(path).Equals(".tmp", StringComparison.OrdinalIgnoreCase) && logEvent != SuncatLogEvent.RenameFile);
                 if (!ignored) ignored |= Path.GetExtension(path).Equals(".lnk", StringComparison.OrdinalIgnoreCase);
-                if (!ignored) ignored |= (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName)
-                                          && path.StartsWith($@"{rootDrive}Users\") && !path.StartsWith($@"{rootDrive}Users\{manager.CurrentSession.UserName}\"));
+                if (!ignored) ignored |= (session != null && !string.IsNullOrEmpty(session.UserName)
+                                          && path.StartsWith($@"{rootDrive}Users\") && !path.StartsWith($@"{rootDrive}Users\{session.UserName}\"));
                 if (!ignored) ignored |= (path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), StringComparison.OrdinalIgnoreCase)
                                           && !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase));
                 if (!ignored) ignored |= (path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), StringComparison.OrdinalIgnoreCase)
@@ -167,16 +167,16 @@ namespace SuncatService.Monitors
             {
                 try
                 {
-                    var manager = new TerminalServicesManager();
+                    var session = SuncatUtilities.GetActiveSession();
 
-                    if (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName))
+                    if (session != null && !string.IsNullOrEmpty(session.UserName))
                     {
                         var recentFolder = Path.Combine(serviceAppData, "Recent");
 
                         using (var process = Process.Start(new ProcessStartInfo()
                         {
                             FileName = "robocopy",
-                            Arguments = $"\"{rootDrive}Users\\{manager.CurrentSession.UserName}\\AppData\\Roaming\\Microsoft\\Windows\\Recent\" \"{recentFolder}\" /XF \"desktop.ini\" /MAX:1000000 /A-:SH /PURGE /NP",
+                            Arguments = $"\"{rootDrive}Users\\{session.UserName}\\AppData\\Roaming\\Microsoft\\Windows\\Recent\" \"{recentFolder}\" /XF \"desktop.ini\" /MAX:1000000 /A-:SH /PURGE /NP",
                             WindowStyle = ProcessWindowStyle.Hidden,
                             CreateNoWindow = true,
                             UseShellExecute = false,
@@ -208,7 +208,7 @@ namespace SuncatService.Monitors
                                             firstRecentFileDate = recentFileDate;
                                         }
 
-                                        link.TargetPath = link.TargetPath.Replace(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), $@"{rootDrive}Users\{manager.CurrentSession.UserName}");
+                                        link.TargetPath = link.TargetPath.Replace(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), $@"{rootDrive}Users\{session.UserName}");
 
                                         if (recentFileDate > lastRecentFileDate && System.IO.File.Exists(link.TargetPath))
                                         {
