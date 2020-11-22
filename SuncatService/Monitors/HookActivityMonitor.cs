@@ -60,10 +60,10 @@ namespace SuncatService.Monitors
                                 {
                                     var manager = new TerminalServicesManager();
 
-                                    if (manager != null && manager.ActiveConsoleSession != null && !string.IsNullOrEmpty(manager.ActiveConsoleSession.UserName))
+                                    if (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName))
                                     {
                                         var mapName = $@"Suncat{type}HookMap";
-                                        var mapFile = $@"{rootDrive}Users\{manager.ActiveConsoleSession.UserName}\AppData\Local\{serviceName}\Hook\{mapName}.data";
+                                        var mapFile = $@"{rootDrive}Users\{manager.CurrentSession.UserName}\AppData\Local\{serviceName}\Hook\{mapName}.data";
 
                                         if (File.Exists(mapFile))
                                         {
@@ -175,15 +175,15 @@ namespace SuncatService.Monitors
                 {
                     var manager = new TerminalServicesManager();
 
-                    if (manager != null && manager.ActiveConsoleSession != null && !string.IsNullOrEmpty(manager.ActiveConsoleSession.UserName))
+                    if (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName))
                     {
                         using (var ts = new TaskService())
                         {
                             var processes = Process.GetProcessesByName("suncatsat");
 
-                            if (processes.Length > 1 || lastSessionUser != manager.ActiveConsoleSession.UserAccount.Value)
+                            if (processes.Length > 1 || lastSessionUser != manager.CurrentSession.UserAccount.Value)
                             {
-                                lastSessionUser = manager.ActiveConsoleSession.UserAccount.Value;
+                                lastSessionUser = manager.CurrentSession.UserAccount.Value;
 
                                 foreach (var process in processes)
                                 {
@@ -197,7 +197,7 @@ namespace SuncatService.Monitors
                             {
                                 var assemblyLocationPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
 
-                                task = ts.AddTask(hookAssemblyTitle, QuickTriggerType.TaskRegistration, $@"{assemblyLocationPath}\suncatsat.exe", null, manager.ActiveConsoleSession.UserAccount.Value, null, TaskLogonType.InteractiveToken, null);
+                                task = ts.AddTask(hookAssemblyTitle, QuickTriggerType.TaskRegistration, $@"{assemblyLocationPath}\suncatsat.exe", null, manager.CurrentSession.UserAccount.Value, null, TaskLogonType.InteractiveToken, null);
                                 task.Definition.Principal.RunLevel = TaskRunLevel.Highest;
                                 task.Definition.Settings.ExecutionTimeLimit = TimeSpan.Zero;
                                 task.RegisterChanges();

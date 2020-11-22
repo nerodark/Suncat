@@ -1,4 +1,4 @@
-﻿using RawInput;
+﻿using RawInputLib;
 using SHDocVw;
 using Shell32;
 using SuncatCommon;
@@ -24,8 +24,7 @@ namespace SuncatHook
 {
     public partial class SuncatHook : Form
     {
-        private InputDevice id;
-        private int NumberOfKeyboards;
+        private RawInput rawinput;
         private Thread serverChecker;
         private Thread globalKeyboardHookLogger;
         private Thread globalWindowHookLogger;
@@ -63,7 +62,8 @@ namespace SuncatHook
             
             try
             {
-                Subscribe();
+                // RawInput has to be processed only when the form is fully loaded or the event won't fire
+                SubscribeRawInput();
 
                 var windowHandle = GetForegroundWindow();
                 lastActiveWindowTitle = windowHandle != IntPtr.Zero ? GetActiveWindowTitle(windowHandle) : string.Empty;
@@ -122,15 +122,18 @@ namespace SuncatHook
             }
         }
 
-        // The WndProc is overridden to allow InputDevice to intercept
-        // messages to the window and thus catch WM_INPUT messages
+        private void SuncatHook_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            rawinput.KeyPressed -= RawInput_KeyPressed;
+        }
+
         protected override void WndProc(ref Message message)
         {
             try
             {
-                if (id != null)
+                if (rawinput != null)
                 {
-                    id.ProcessMessage(message);
+                    rawinput.ProcessMessage(message);
                 }
             }
             catch (Exception ex)
@@ -149,11 +152,10 @@ namespace SuncatHook
 
                 try
                 {
-                    NumberOfKeyboards = id.EnumerateDevices();
-
-                    if (id != null)
+                    if (rawinput != null)
                     {
-                        id.ProcessMessage(message);
+                        rawinput.EnumerateDevices();
+                        rawinput.ProcessMessage(message);
                     }
                 }
                 catch (Exception ex2)
@@ -914,11 +916,11 @@ namespace SuncatHook
                         });
         }
 
-        private void Subscribe()
+        private void SubscribeRawInput()
         {
-            id = new InputDevice(Handle);
-            NumberOfKeyboards = id.EnumerateDevices();
-            id.KeyPressed += new InputDevice.DeviceEventHandler(RawInput_KeyPressed);
+            rawinput = new RawInput(Handle, false, true);
+            rawinput.KeyPressed += RawInput_KeyPressed;
+            rawinput.AddMessageFilter();
         }
 
         private Keys GetKeysFromChar(char c)
@@ -938,36 +940,41 @@ namespace SuncatHook
             return keys;
         }
 
-        private void RawInput_KeyPressed(object sender, InputDevice.KeyControlEventArgs e)
+        private void RawInput_KeyPressed(object sender, RawInputEventArg e)
         {
-            lock (keyboardDataLock)
+            // Key down event is really important for the keys order (Key up might be disordered due to how fingers are released in a short time)
+            // VirtualBox might not always send key down events when focused on it
+            if (e.KeyPressEvent.DeviceType == "KEYBOARD" && (e.KeyPressEvent.KeyPressState == "MAKE" || e.KeyPressEvent.Message == Win32.WM_KEYDOWN || e.KeyPressEvent.Message == Win32.WM_SYSKEYDOWN))
             {
-                if (loggerSubscription != null)
+                lock (keyboardDataLock)
                 {
-                    loggerSubscription.Dispose();
-                }
+                    if (loggerSubscription != null)
+                    {
+                        loggerSubscription.Dispose();
+                    }
 
-                try
-                {
-                    var key = (Keys)e.Keyboard.key;
-                    AddKeyCodeToBuffer(key);
-                }
-                catch (Exception ex)
-                {
-                    #if DEBUG
-                        Debug.WriteLine(ex);
-                        
-                        if (ex.InnerException != null)
-                            Debug.WriteLine(ex.InnerException);
-                    #else
-                        Trace.WriteLine(ex);
+                    try
+                    {
+                        var key = (Keys)e.KeyPressEvent.VKey;
+                        AddKeyCodeToBuffer(key);
+                    }
+                    catch (Exception ex)
+                    {
+                        #if DEBUG
+                            Debug.WriteLine(ex);
+                            
+                            if (ex.InnerException != null)
+                                Debug.WriteLine(ex.InnerException);
+                        #else
+                            Trace.WriteLine(ex);
 
-                        if (ex.InnerException != null)
-                            Trace.WriteLine(ex.InnerException);
-                    #endif
-                }
+                            if (ex.InnerException != null)
+                                Trace.WriteLine(ex.InnerException);
+                        #endif
+                    }
 
-                SubscribeKeyboardLogger();
+                    SubscribeKeyboardLogger();
+                }
             }
         }
 

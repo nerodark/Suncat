@@ -14,6 +14,7 @@ namespace SuncatHook
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new SuncatHook());
+            //Application.Run(new RawInputTestForm());
         }
     }
 }

@@ -1,44 +1,72 @@
-﻿using System.Windows.Forms;
+﻿using System;
+using RawInputLib;
+using System.Diagnostics;
+using System.Globalization;
+using System.Windows.Forms;
 
-namespace RawInput {
-    public partial class RawInputTestForm : Form {
-        InputDevice id;
-        int NumberOfKeyboards;
 
-        public RawInputTestForm() {
+namespace SuncatHook
+{
+    public partial class RawInputTestForm : Form
+    {
+        private readonly RawInput _rawinput;
+        
+        const bool CaptureOnlyInForeground = true;
+        // Todo: add checkbox to form when checked/uncheck create method to call that does the same as RawInputTestForm ctor 
+
+        public RawInputTestForm()
+        {
             InitializeComponent();
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
-            // Create a new InputDevice object, get the number of
-            // keyboards, and register the method which will handle the 
-            // InputDevice KeyPressed event
-            id = new InputDevice(Handle);
-            NumberOfKeyboards = id.EnumerateDevices();
-            id.KeyPressed += new InputDevice.DeviceEventHandler(m_KeyPressed);
+            _rawinput = new RawInput(Handle, CaptureOnlyInForeground);
+           
+            _rawinput.AddMessageFilter();   // Adding a message filter will cause keypresses to be handled
+            Win32.DeviceAudit();            // Writes a file DeviceAudit.txt to the current directory
+
+            _rawinput.KeyPressed += OnKeyPressed;   
         }
 
-        // The WndProc is overridden to allow InputDevice to intercept
-        // messages to the window and thus catch WM_INPUT messages
-        protected override void WndProc(ref Message message) {
-            if(id != null) {
-                id.ProcessMessage(message);
-            }
-            base.WndProc(ref message);
+        private void OnKeyPressed(object sender, RawInputEventArg e)
+        {
+            lbHandle.Text = e.KeyPressEvent.DeviceHandle.ToString();
+            lbType.Text = e.KeyPressEvent.DeviceType;
+            lbName.Text = e.KeyPressEvent.DeviceName;
+            lbDescription.Text = e.KeyPressEvent.Name;
+            lbKey.Text = e.KeyPressEvent.VKey.ToString(CultureInfo.InvariantCulture);
+            lbNumKeyboards.Text = _rawinput.NumberOfKeyboards.ToString(CultureInfo.InvariantCulture);
+            lbVKey.Text = e.KeyPressEvent.VKeyName;
+            lbSource.Text = e.KeyPressEvent.Source;
+            lbKeyPressState.Text = e.KeyPressEvent.KeyPressState;
+            lbMessage.Text = string.Format("0x{0:X4} ({0})", e.KeyPressEvent.Message);
+           
+            //switch (e.KeyPressEvent.Message)
+            //{
+            //    case Win32.WM_KEYDOWN:
+            //        Debug.WriteLine(e.KeyPressEvent.KeyPressState);
+            //        break;
+            //     case Win32.WM_KEYUP:
+            //        Debug.WriteLine(e.KeyPressEvent.KeyPressState);
+            //        break;
+            //}
         }
 
-        private void m_KeyPressed(object sender, InputDevice.KeyControlEventArgs e) {
-            //Replace() is just a cosmetic fix to stop ampersands turning into underlines
-            lbHandle.Text = e.Keyboard.deviceHandle.ToString();
-            lbType.Text = e.Keyboard.deviceType;
-            lbName.Text = e.Keyboard.deviceName.Replace("&", "&&");
-            lbDescription.Text = e.Keyboard.Name;
-            lbKey.Text = e.Keyboard.key.ToString();
-            lbNumKeyboards.Text = NumberOfKeyboards.ToString();
-            lbVKey.Text = e.Keyboard.vKey;
+        private void RawInputTestForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            _rawinput.KeyPressed -= OnKeyPressed;
         }
 
-        private void btnClose_Click(object sender, System.EventArgs e) {
-            this.Close();
-        }
+        private static void CurrentDomain_UnhandledException(Object sender, UnhandledExceptionEventArgs e)
+        {
+            var ex = e.ExceptionObject as Exception;
 
+            if (null == ex) return;
+
+            // Log this error. Logging the exception doesn't correct the problem but at least now
+            // you may have more insight as to why the exception is being thrown.
+            Debug.WriteLine("Unhandled Exception: " + ex.Message);
+            Debug.WriteLine("Unhandled Exception: " + ex);
+            MessageBox.Show(ex.Message);
+        }
     }
 }

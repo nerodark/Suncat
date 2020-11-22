@@ -36,6 +36,7 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
             this.Name = "SuncatHook";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.SuncatHook_FormClosing);
             this.Load += new System.EventHandler(this.SuncatHook_Load);
             this.ResumeLayout(false);
 

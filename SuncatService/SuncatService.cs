@@ -83,7 +83,7 @@ namespace SuncatService
             {
                 var manager = new TerminalServicesManager();
 
-                if (manager != null && manager.ActiveConsoleSession != null && !string.IsNullOrEmpty(manager.ActiveConsoleSession.UserName))
+                if (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName))
                 {
                     var text =
                         $"[{log.DateTime}] {log.Event}: " +
@@ -313,7 +313,7 @@ namespace SuncatService
                         command.Parameters.AddWithValue("@Data2", string.IsNullOrWhiteSpace(data2) ? (object)DBNull.Value : data2);
                         command.Parameters.AddWithValue("@Data3", string.IsNullOrWhiteSpace(data3) ? (object)DBNull.Value : data3);
                         command.Parameters.AddWithValue("@ComputerName", Environment.MachineName ?? string.Empty);
-                        command.Parameters.AddWithValue("@UserName", manager.ActiveConsoleSession.UserName ?? string.Empty);
+                        command.Parameters.AddWithValue("@UserName", manager.CurrentSession.UserName ?? string.Empty);
                         command.Parameters.AddWithValue("@LocalIp", string.IsNullOrEmpty(localIp) ? (object)DBNull.Value : localIp);
                         command.Parameters.AddWithValue("@MacAddress", string.IsNullOrEmpty(macAddress) ? (object)DBNull.Value : macAddress);
 

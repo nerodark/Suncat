@@ -83,56 +83,75 @@ namespace SuncatService.Monitors
 
             Func<SuncatLogEvent, string, string, bool> ignoreFilePatterns = delegate (SuncatLogEvent logEvent, string path, string oldPath)
             {
-                if (path != null && path.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
+                if (path != null && path.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
                 {
                     return false;
                 }
 
-                if (oldPath != null && oldPath.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
+                if (oldPath != null && oldPath.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
                 {
                     return false;
                 }
 
                 var manager = new TerminalServicesManager();
-                
-                ignored |= Regex.IsMatch(path, $@"^{rootDrive}Users\[^\]+\AppData\".Replace(@"\", @"\\"), RegexOptions.IgnoreCase);
-                ignored |= path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.Windows), StringComparison.OrdinalIgnoreCase);
-                ignored |= path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), StringComparison.OrdinalIgnoreCase);
-                ignored |= path.IndexOf("$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase) > -1;
-                ignored |= path.IndexOf("$WINDOWS", StringComparison.OrdinalIgnoreCase) > -1;
-                ignored |= path.IndexOf("Config.Msi", StringComparison.OrdinalIgnoreCase) > -1;
-                ignored |= path.IndexOf("System Volume Information", StringComparison.OrdinalIgnoreCase) > -1;
-                ignored |= path.IndexOf("WindowsApps", StringComparison.OrdinalIgnoreCase) > -1;
-                ignored |= path.IndexOf("SystemApps", StringComparison.OrdinalIgnoreCase) > -1;
-                ignored |= path.EndsWith("desktop.ini", StringComparison.OrdinalIgnoreCase);
-                ignored |= (Path.GetFileName(path).StartsWith("~") && logEvent != SuncatLogEvent.RenameFile);
-                ignored |= (Path.GetFileName(path).EndsWith("~") && logEvent != SuncatLogEvent.RenameFile);
-                ignored |= (Path.GetExtension(path).Equals(".tmp", StringComparison.OrdinalIgnoreCase) && logEvent != SuncatLogEvent.RenameFile);
-                ignored |= Path.GetExtension(path).Equals(".lnk", StringComparison.OrdinalIgnoreCase);
-                ignored |= (manager != null && manager.ActiveConsoleSession != null && !string.IsNullOrEmpty(manager.ActiveConsoleSession.UserName)
-                            && path.StartsWith($@"{rootDrive}Users\") && !path.StartsWith($@"{rootDrive}Users\{manager.ActiveConsoleSession.UserName}\"));
-                ignored |= (path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), StringComparison.OrdinalIgnoreCase)
-                            && !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase));
-                ignored |= (path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), StringComparison.OrdinalIgnoreCase)
-                            && !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase));
-                ignored |= path.Contains(@"\.");
+
+                if (!ignored) ignored |= Regex.IsMatch(path, $@"^{rootDrive}Users\[^\]+\AppData\".Replace(@"\", @"\\"), RegexOptions.IgnoreCase);
+                if (!ignored) ignored |= path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.Windows), StringComparison.OrdinalIgnoreCase);
+                if (!ignored) ignored |= path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), StringComparison.OrdinalIgnoreCase);
+                if (!ignored) ignored |= path.IndexOf("$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase) > -1;
+                if (!ignored) ignored |= path.IndexOf("$WINDOWS", StringComparison.OrdinalIgnoreCase) > -1;
+                if (!ignored) ignored |= path.IndexOf("Config.Msi", StringComparison.OrdinalIgnoreCase) > -1;
+                if (!ignored) ignored |= path.IndexOf("System Volume Information", StringComparison.OrdinalIgnoreCase) > -1;
+                if (!ignored) ignored |= path.IndexOf("WindowsApps", StringComparison.OrdinalIgnoreCase) > -1;
+                if (!ignored) ignored |= path.IndexOf("SystemApps", StringComparison.OrdinalIgnoreCase) > -1;
+                if (!ignored) ignored |= path.EndsWith("desktop.ini", StringComparison.OrdinalIgnoreCase);
+                if (!ignored) ignored |= (Path.GetFileName(path).StartsWith("~") && logEvent != SuncatLogEvent.RenameFile);
+                if (!ignored) ignored |= (Path.GetFileName(path).EndsWith("~") && logEvent != SuncatLogEvent.RenameFile);
+                if (!ignored) ignored |= (Path.GetExtension(path).Equals(".tmp", StringComparison.OrdinalIgnoreCase) && logEvent != SuncatLogEvent.RenameFile);
+                if (!ignored) ignored |= Path.GetExtension(path).Equals(".lnk", StringComparison.OrdinalIgnoreCase);
+                if (!ignored) ignored |= (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName)
+                                          && path.StartsWith($@"{rootDrive}Users\") && !path.StartsWith($@"{rootDrive}Users\{manager.CurrentSession.UserName}\"));
+                if (!ignored) ignored |= (path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), StringComparison.OrdinalIgnoreCase)
+                                          && !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase));
+                if (!ignored) ignored |= (path.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), StringComparison.OrdinalIgnoreCase)
+                                          && !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase));
+                if (!ignored) ignored |= path.Contains(@"\."); // folder starting with dot
+
+                try
+                {
+                    if (!ignored) ignored |= new FileInfo(path).Attributes.HasFlag(FileAttributes.Hidden);
+                }
+                catch (Exception ex)
+                {
+                    #if DEBUG
+                        Debug.WriteLine(ex);
+                        
+                        if (ex.InnerException != null)
+                            Debug.WriteLine(ex.InnerException);
+                    #else
+                        Trace.WriteLine(ex);
+
+                        if (ex.InnerException != null)
+                            Trace.WriteLine(ex.InnerException);
+                    #endif
+                }
                 
                 return ignored;
             };
 
-            if (log.Data1 != null)
+            if (log.Event != SuncatLogEvent.RenameFile && log.Data1 != null)
             {
                 ignored |= ignoreFilePatterns(log.Event, log.Data1, null);
             }
 
-            if (log.Data2 != null)
+            if (log.Event != SuncatLogEvent.RenameFile && log.Data2 != null)
             {
                 ignored |= ignoreFilePatterns(log.Event, log.Data2, null);
             }
 
-            if (log.Event == SuncatLogEvent.RenameFile)
+            if (log.Event == SuncatLogEvent.RenameFile && log.Data1 != null && log.Data2 != null)
             {
-                ignored |= ignoreFilePatterns(log.Event, log.Data1, log.Data2);
+                ignored |= ignoreFilePatterns(log.Event, log.Data2, log.Data1);
             }
 
             return ignored;
@@ -150,14 +169,14 @@ namespace SuncatService.Monitors
                 {
                     var manager = new TerminalServicesManager();
 
-                    if (manager != null && manager.ActiveConsoleSession != null && !string.IsNullOrEmpty(manager.ActiveConsoleSession.UserName))
+                    if (manager != null && manager.CurrentSession != null && !string.IsNullOrEmpty(manager.CurrentSession.UserName))
                     {
                         var recentFolder = Path.Combine(serviceAppData, "Recent");
 
                         using (var process = Process.Start(new ProcessStartInfo()
                         {
                             FileName = "robocopy",
-                            Arguments = $"\"{rootDrive}Users\\{manager.ActiveConsoleSession.UserName}\\AppData\\Roaming\\Microsoft\\Windows\\Recent\" \"{recentFolder}\" /XF \"desktop.ini\" /MAX:1000000 /A-:SH /PURGE /NP",
+                            Arguments = $"\"{rootDrive}Users\\{manager.CurrentSession.UserName}\\AppData\\Roaming\\Microsoft\\Windows\\Recent\" \"{recentFolder}\" /XF \"desktop.ini\" /MAX:1000000 /A-:SH /PURGE /NP",
                             WindowStyle = ProcessWindowStyle.Hidden,
                             CreateNoWindow = true,
                             UseShellExecute = false,
@@ -189,7 +208,7 @@ namespace SuncatService.Monitors
                                             firstRecentFileDate = recentFileDate;
                                         }
 
-                                        link.TargetPath = link.TargetPath.Replace(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), $@"{rootDrive}Users\{manager.ActiveConsoleSession.UserName}");
+                                        link.TargetPath = link.TargetPath.Replace(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), $@"{rootDrive}Users\{manager.CurrentSession.UserName}");
 
                                         if (recentFileDate > lastRecentFileDate && System.IO.File.Exists(link.TargetPath))
                                         {
